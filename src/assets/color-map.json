@@ -1,0 +1,32 @@
+{
+  "purple": {
+    "#D7CDF5": "bg1",
+    "#AA9BF0": "bg2",
+    "#7864D7": "bg3",
+    "#181817": "black",
+    "#F9ECB0": "obj1",
+    "#F9A3AA": "obj2",
+    "#FFE3E1": "obj3",
+    "#FFFFFF": "white"
+  },
+  "orange": {
+    "#FDD7B9": "bg1",
+    "#FAC896": "bg2",
+    "#D27532": "bg3",
+    "#181817": "black",
+    "#F9ECB0": "obj1",
+    "#80DADA": "obj2",
+    "#BEEBEB": "obj3",
+    "#FFFFFF": "white"
+  },
+  "teal": {
+    "#BEEBEB": "bg1",
+    "#80DADA": "bg2",
+    "#5ABEBE": "bg3",
+    "#181817": "black",
+    "#FFD4F2": "obj1",
+    "#6D7BFC": "obj2",
+    "#B6C6FE": "obj3",
+    "#FFFFFF": "white"
+  }
+}

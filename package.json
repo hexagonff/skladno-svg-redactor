@@ -7,11 +7,13 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
-    "lint": "eslint . --max-warnings 0 && prettier --check ."
+    "lint": "eslint . --max-warnings 0 && prettier --check .",
+    "build:library": "tsx scripts/build-library.ts"
   },
   "dependencies": {
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "@xmldom/xmldom": "^0.9.12"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -28,7 +30,8 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.0",
     "vite": "^7.1.0",
-    "vitest": "^4.0.0"
+    "vitest": "^4.0.0",
+    "tsx": "^4.23.15"
   },
   "engines": {
     "node": "^20.19.0 || ^22.13.0 || >=24.0.0"
