@@ -1,0 +1,43 @@
+.object-rotation {
+  margin-top: 16px;
+}
+.object-rotation__field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+.object-rotation__buttons {
+  display: flex;
+  gap: 6px;
+}
+.rotation-button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 34px;
+  padding: 6px;
+  border: 1px solid #dedbe7;
+  border-radius: 6px;
+  background: #f4f0fc;
+  color: var(--accent);
+}
+.rotation-button:hover {
+  background: #e9e1fa;
+}
+.rotation-button svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.object-rotation__angle {
+  min-width: 34px;
+  color: #51495f;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}

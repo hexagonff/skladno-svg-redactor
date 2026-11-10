@@ -317,3 +317,24 @@ describe('buildLibrary input validation', () => {
     );
   });
 });
+
+describe('built-in palette validation with session palettes available', () => {
+  it('still requires each built-in palette and its source canvas metadata', () => {
+    const withoutCanvas = schemes.map((scheme) => {
+      if (scheme.id !== 'purple') return scheme;
+      const { canvas: _canvas, ...rest } = scheme;
+      void _canvas;
+      return rest;
+    });
+    expect(() => buildLibrary(sources, withoutCanvas, colorMaps)).toThrow(
+      /Incorrect canvas assignment for purple/,
+    );
+    const custom = { ...schemes[0], id: 'custom-scheme-1' as const };
+    expect(() =>
+      buildLibrary(sources, [custom, ...schemes.slice(1)], colorMaps),
+    ).toThrow(/Missing or duplicate scheme: purple/);
+    expect(() =>
+      buildLibrary(sources, [...schemes, custom], colorMaps),
+    ).toThrow(/exactly three color schemes/);
+  });
+});

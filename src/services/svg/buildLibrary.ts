@@ -30,6 +30,7 @@ function validateSchemes(
       throw new Error(`Missing or duplicate scheme: ${id}`);
     }
     if (
+      scheme.canvas === undefined ||
       !scheme.canvas.startsWith('canvas') ||
       SOURCE_SCHEMES[scheme.canvas] !== id
     ) {

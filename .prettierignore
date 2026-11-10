@@ -8,3 +8,5 @@ allPictures/
 colors bg-object by bg/
 src/assets/library/*.svg
 src/assets/library/manifest.json
+test-results/
+playwright-report/

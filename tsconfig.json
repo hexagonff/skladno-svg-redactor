@@ -13,7 +13,15 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true
   },
-  "include": ["src", "api", "scripts", "vite.config.ts"]
+  "include": [
+    "src",
+    "api",
+    "scripts",
+    "vite.config.ts",
+    "playwright.config.ts",
+    "tests"
+  ]
 }
