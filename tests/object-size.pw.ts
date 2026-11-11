@@ -8,7 +8,7 @@ function viewportBounds(item: Locator) {
 }
 
 async function poseOf(item: Locator): Promise<string> {
-  // Detail changes retain the centre and rotation while normalizing the source width.
+  // Detail changes retain the centre and rotation without normalizing the source width.
   return (await item.getAttribute('transform'))!.split(' scale(')[0]!;
 }
 
@@ -23,14 +23,14 @@ async function expectNativeViewport(
   await expect(viewport).toHaveAttribute('viewBox', `0 0 ${width} ${height}`);
 }
 
-test('each wallet keeps its detail level, normalized size, colors and role in the editor and export', async ({
+test('each wallet keeps its detail level, native size, colors and role in the editor and export', async ({
   page,
 }, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
   const size = page.getByRole('group', {
-    name: 'Детализация объекта',
+    name: 'Размер исходника объекта',
     exact: true,
   });
   await expect(size).toHaveCount(0);
@@ -52,14 +52,8 @@ test('each wallet keeps its detail level, normalized size, colors and role in th
   expect(boardBounds).not.toBeNull();
   await expectNativeViewport(first, 631, 397);
   // The familiar default scale is restored for each new item.
-  expect(largeBounds.width / boardBounds!.width).toBeCloseTo(
-    (631 * 0.35) / 1000,
-    4,
-  );
-  expect(largeBounds.height / boardBounds!.height).toBeCloseTo(
-    (397 * 0.35) / 1000,
-    4,
-  );
+  expect(largeBounds.width / boardBounds!.width).toBeCloseTo(631 / 1000, 4);
+  expect(largeBounds.height / boardBounds!.height).toBeCloseTo(397 / 1000, 4);
   await expect(
     size.getByRole('button', { name: 'L', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true');
@@ -69,7 +63,7 @@ test('each wallet keeps its detail level, normalized size, colors and role in th
         .getByRole('spinbutton', { name: 'Ширина', exact: true })
         .inputValue(),
     ),
-  ).toBeCloseTo(220.85, 2);
+  ).toBeCloseTo(631, 2);
   await page
     .getByRole('group', { name: 'Используемые цвета', exact: true })
     .getByRole('button', { name: 'Участок 1', exact: true })
@@ -95,14 +89,11 @@ test('each wallet keeps its detail level, normalized size, colors and role in th
         .getByRole('spinbutton', { name: 'Ширина', exact: true })
         .inputValue(),
     ),
-  ).toBeCloseTo(220.85, 2);
+  ).toBeCloseTo(316, 2);
   expect(await poseOf(first)).toBe(firstPose);
   const smallBounds = await viewportBounds(first);
-  expect(smallBounds.width / largeBounds.width).toBeCloseTo(1, 4);
-  expect(smallBounds.height / largeBounds.height).toBeCloseTo(
-    (199 / 397) * (631 / 316),
-    4,
-  );
+  expect(smallBounds.width / largeBounds.width).toBeCloseTo(316 / 631, 4);
+  expect(smallBounds.height / largeBounds.height).toBeCloseTo(199 / 397, 4);
   expect(smallBounds.x + smallBounds.width / 2).toBeCloseTo(
     largeBounds.x + largeBounds.width / 2,
     3,
@@ -211,7 +202,7 @@ test('each wallet keeps its detail level, normalized size, colors and role in th
       group!.getAttribute('transform')!,
     );
     expect(scale).not.toBeNull();
-    expect(Number(scale![1])).toBeCloseTo(0.35 * (631 / width), 8);
+    expect(Number(scale![1])).toBeCloseTo(1, 8);
     const viewport = group!.getElementsByTagName('svg')[0]!;
     expect(viewport.getAttribute('width')).toBe(String(width));
     expect(viewport.getAttribute('height')).toBe(String(height));

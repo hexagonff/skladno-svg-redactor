@@ -9,7 +9,12 @@ async function geometryOf(element: Locator): Promise<string> {
         tag: node.tagName,
         attributes: [...node.attributes]
           .filter(({ name }) => !['fill', 'stroke', 'style'].includes(name))
-          .map(({ name, value }) => [name, value]),
+          .map(({ name, value }) => [
+            name,
+            name === 'transform' && node === root
+              ? value.replace(/^translate\([^)]+\)\s*/, '')
+              : value,
+          ]),
       })),
     ),
   );
@@ -24,7 +29,7 @@ test('background pattern, detail and palette are independent and retain object e
   const background = page.getByRole('combobox', { name: 'Фон', exact: true });
   const palette = page.getByRole('combobox', { name: 'Палитра', exact: true });
   const backgroundDetail = page.getByRole('group', {
-    name: 'Детализация фона',
+    name: 'Размер фона',
     exact: true,
   });
   await expect(background).toHaveValue('canvas1');
@@ -47,7 +52,7 @@ test('background pattern, detail and palette are independent and retain object e
   const artwork = canvas.locator('[data-canvas-id]');
   const item = canvas.locator('[data-item-id]');
   const detail = page.getByRole('group', {
-    name: 'Детализация объекта',
+    name: 'Размер исходника объекта',
     exact: true,
   });
   const width = page.getByRole('spinbutton', { name: 'Ширина', exact: true });
@@ -78,7 +83,14 @@ test('background pattern, detail and palette are independent and retain object e
   await page.getByRole('button', { name: 'Фоновый', exact: true }).click();
   await source.click();
   await targets.getByRole('button', { name: 'Цвет 2', exact: true }).click();
-  const objectBefore = await item.evaluate((element) => element.outerHTML);
+  const objectMarkup = () =>
+    item.evaluate((element) =>
+      element.outerHTML.replace(
+        /transform="translate\([^)]+\)/,
+        'transform="translate(position)',
+      ),
+    );
+  const objectBefore = await objectMarkup();
   const objectGeometry = await geometryOf(item);
   const selectedChoice = page.getByRole('button', {
     name: 'Выбрать: Кошелёк, 1',
@@ -123,6 +135,14 @@ test('background pattern, detail and palette are independent and retain object e
       await expect(artwork).toHaveAttribute('data-canvas-id', canvasId);
       await expect(artwork).toHaveAttribute('data-detail-size', size);
       const sourceDimension = size === 'L' ? '1000' : '500';
+      await expect(canvas.locator(':scope > svg')).toHaveAttribute(
+        'viewBox',
+        '0 0 ' + sourceDimension + ' ' + sourceDimension,
+      );
+      await expect(artwork).toHaveAttribute(
+        'transform',
+        new RegExp('scale\\(1\\)'),
+      );
       await expect(artwork.locator('svg')).toHaveAttribute(
         'viewBox',
         `0 0 ${sourceDimension} ${sourceDimension}`,
@@ -140,9 +160,7 @@ test('background pattern, detail and palette are independent and retain object e
         'fill',
         '#D7CDF5',
       );
-      expect(await item.evaluate((element) => element.outerHTML)).toBe(
-        objectBefore,
-      );
+      expect(await objectMarkup()).toBe(objectBefore);
       await expectEdits();
     }
   }
@@ -193,6 +211,7 @@ test('background pattern, detail and palette are independent and retain object e
     /var\s*\(|object-selection|resize-corner|<button/,
   );
   const document = new DOMParser().parseFromString(exported, 'image/svg+xml');
+  expect(document.documentElement!.getAttribute('viewBox')).toBe('0 0 500 500');
   const exportedBackground = Array.from(
     document.getElementsByTagName('g'),
   ).find((group) => group.hasAttribute('data-canvas-id'));

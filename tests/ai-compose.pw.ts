@@ -7,7 +7,7 @@ const STUDY_PLAN = {
   items: [
     { assetId: 'book', role: 'main', size: 'S' },
     { assetId: 'lamp', role: 'bg', size: 'S' },
-    { assetId: 'phone', role: 'main', size: 'L' },
+    { assetId: 'phone', role: 'main', size: 'S' },
   ],
   message: 'Собрана композиция для учёбы: книга, лампа и телефон.',
 };
@@ -91,7 +91,12 @@ test('description honors selected L/S and roles, preserves background and palett
   );
   expect(received).toBeDefined();
   expect(received!.prompt).toBe('Готовлюсь к экзамену');
-  expect(Object.keys(received!).sort()).toEqual(['catalog', 'prompt']);
+  expect(received!.canvas).toEqual({ width: 1000, height: 1000 });
+  expect(Object.keys(received!).sort()).toEqual([
+    'canvas',
+    'catalog',
+    'prompt',
+  ]);
   expect(received!.catalog).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
@@ -99,6 +104,10 @@ test('description honors selected L/S and roles, preserves background and palett
         name: 'Книга',
         description: expect.any(String),
         availableSizes: ['L', 'S'],
+        sourceSizes: {
+          L: { width: 1446, height: 977 },
+          S: { width: 723, height: 489 },
+        },
       }),
       expect.objectContaining({
         id: 'custom-1',
@@ -128,10 +137,7 @@ test('description honors selected L/S and roles, preserves background and palett
       '[data-item-id][data-asset-id="' + assetId + '"]',
     );
     await expect(item).toHaveAttribute('data-detail-size', size);
-    await expect(item).toHaveAttribute(
-      'transform',
-      size === 'S' ? /rotate\(0\) scale\(0\.7\)/ : /rotate\(0\) scale\(0\.35\)/,
-    );
+    await expect(item).toHaveAttribute('transform', /rotate\(0\) scale\(1\)/);
   }
   await expect(
     canvas(page).locator('[data-asset-id="book"] svg'),
@@ -193,7 +199,7 @@ test('description honors selected L/S and roles, preserves background and palett
   ).toEqual([
     ['lamp', 'S'],
     ['book', 'S'],
-    ['phone', 'L'],
+    ['phone', 'S'],
   ]);
   expect(exported).not.toMatch(/<image|foreignObject|<style|var\s*\(/);
 
@@ -210,6 +216,139 @@ test('description honors selected L/S and roles, preserves background and palett
   await expect(promptInput(page)).toHaveValue('Будильник');
   expect(pageErrors).toEqual([]);
 });
+
+for (const backgroundSize of ['L', 'S'] as const) {
+  test(
+    'AI keeps oversized L sources and smaller accents on ' +
+      backgroundSize +
+      ' background',
+    async ({ page }, testInfo) => {
+      const errors: string[] = [];
+      page.on('pageerror', (error) => errors.push(error.message));
+      if (backgroundSize === 'S')
+        await page.setViewportSize({ width: 390, height: 800 });
+      const reply = {
+        items: [
+          { assetId: 'pen', role: 'main', size: 'S' },
+          { assetId: 'book', role: 'main', size: 'L' },
+          { assetId: 'lamp', role: 'bg', size: 'L' },
+        ],
+        message: 'Крупная книга и лампа с небольшой ручкой.',
+      };
+      await page.route(COMPOSE_URL, (route) => fulfill(route, reply));
+      await page.goto('/');
+      await page
+        .getByRole('group', { name: 'Размер фона', exact: true })
+        .getByRole('button', { name: backgroundSize, exact: true })
+        .click();
+      await promptInput(page).fill(
+        'Крупная книга и лампа, маленькая ручка поверх',
+      );
+      await submitButton(page).click();
+      await expect(composer(page).getByRole('status')).toHaveText(
+        reply.message,
+      );
+      await expect(composer(page).getByRole('alert')).toHaveCount(0);
+      const artwork = canvas(page);
+      const dimension = backgroundSize === 'L' ? 1000 : 500;
+      await expect(artwork.locator(':scope > svg')).toHaveAttribute(
+        'viewBox',
+        '0 0 ' + dimension + ' ' + dimension,
+      );
+      await expect(artwork.locator(':scope > svg')).toHaveAttribute(
+        'overflow',
+        'hidden',
+      );
+      const items = artwork.locator('[data-item-id]');
+      await expect(items).toHaveCount(3);
+      expect(
+        await items.evaluateAll((nodes) =>
+          nodes.map((node) => node.getAttribute('data-asset-id')),
+        ),
+      ).toEqual(['lamp', 'book', 'pen']);
+      for (const [id, size, width, height] of [
+        ['lamp', 'L', 946, 1129],
+        ['book', 'L', 1446, 977],
+        ['pen', 'S', 255, 143],
+      ] as const) {
+        const item = artwork.locator(
+          '[data-item-id][data-asset-id="' + id + '"]',
+        );
+        await expect(item).toHaveAttribute('data-detail-size', size);
+        await expect(item).toHaveAttribute(
+          'transform',
+          /rotate\(0\) scale\(1\)/,
+        );
+        await expect(item.locator('svg')).toHaveAttribute(
+          'width',
+          String(width),
+        );
+        await expect(item.locator('svg')).toHaveAttribute(
+          'height',
+          String(height),
+        );
+      }
+      await artwork.screenshot({
+        path: testInfo.outputPath('oversized-sources.png'),
+      });
+      await page.getByRole('button', { name: /^Выбрать: Книга,/ }).click();
+      await expect(
+        page.getByRole('spinbutton', { name: 'Ширина', exact: true }),
+      ).toHaveValue('1446');
+      await expect(
+        page.getByRole('spinbutton', { name: 'Высота', exact: true }),
+      ).toHaveValue('977');
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      ).toBe(true);
+      const downloading = page.waitForEvent('download');
+      await page
+        .getByRole('button', { name: 'Скачать SVG', exact: true })
+        .click();
+      const filename = await (await downloading).path();
+      expect(filename).not.toBeNull();
+      const exported = await readFile(filename!, 'utf8');
+      const exportedDocument = new DOMParser().parseFromString(
+        exported,
+        'image/svg+xml',
+      );
+      expect(exportedDocument.documentElement!.getAttribute('viewBox')).toBe(
+        '0 0 ' + dimension + ' ' + dimension,
+      );
+      expect(exportedDocument.documentElement!.getAttribute('overflow')).toBe(
+        'hidden',
+      );
+      const exportedItems = Array.from(
+        exportedDocument.getElementsByTagName('g'),
+      ).filter((group) => group.hasAttribute('data-item-id'));
+      expect(
+        exportedItems.map((group) => [
+          group.getAttribute('data-asset-id'),
+          group.getAttribute('data-detail-size'),
+        ]),
+      ).toEqual([
+        ['lamp', 'L'],
+        ['book', 'L'],
+        ['pen', 'S'],
+      ]);
+      const book = exportedItems.find(
+        (group) => group.getAttribute('data-asset-id') === 'book',
+      )!;
+      expect(book.getElementsByTagName('svg')[0]!.getAttribute('width')).toBe(
+        '1446',
+      );
+      expect(book.getElementsByTagName('svg')[0]!.getAttribute('height')).toBe(
+        '977',
+      );
+      expect(exported).not.toMatch(
+        /<image|foreignObject|<style|object-selection/,
+      );
+      expect(errors).toEqual([]);
+    },
+  );
+}
 
 test('API errors preserve the complete scene and description and allow retry', async ({
   page,
@@ -288,7 +427,7 @@ test('cancellation prevents late responses from overwriting the next composition
   await promptInput(page).fill('Первый запрос');
   await submitButton(page).click();
   await expect(composer(page).getByRole('status')).toHaveText(
-    'Подбираем объекты, роли и детализацию…',
+    'Подбираем объекты, роли и исходные размеры…',
   );
   await expect.poll(() => requests).toBe(1);
   await expect(promptInput(page)).toBeDisabled();

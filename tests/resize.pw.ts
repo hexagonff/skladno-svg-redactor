@@ -62,15 +62,15 @@ test('manual dimensions preserve proportions and affect only the selected object
   const width = page.getByRole('spinbutton', { name: 'Ширина', exact: true });
   const height = page.getByRole('spinbutton', { name: 'Высота', exact: true });
   const detail = page.getByRole('group', {
-    name: 'Детализация объекта',
+    name: 'Размер исходника объекта',
     exact: true,
   });
   await expect(
     page.getByRole('group', { name: 'Размер объекта', exact: true }),
   ).toBeVisible();
-  await expectDimension(width, 220.85);
-  await expectDimension(height, 138.95);
-  expect((await sceneSize(first, canvas)).width).toBeCloseTo(220.85, 3);
+  await expectDimension(width, 631);
+  await expectDimension(height, 397);
+  expect((await sceneSize(first, canvas)).width).toBeCloseTo(631, 3);
 
   await addWallet.click();
   const second = canvas.locator('[data-item-id]').nth(1);
@@ -118,10 +118,10 @@ test('manual dimensions preserve proportions and affect only the selected object
   await expect(first).toHaveAttribute('data-detail-size', 'S');
   await expect(second).toHaveAttribute('data-detail-size', 'L');
   dimensions = await sceneSize(first, canvas);
-  expect(dimensions.width).toBeCloseTo(resizedWidth, 3);
+  expect(dimensions.width).toBeCloseTo(316, 3);
   expect(dimensions.width / dimensions.height).toBeCloseTo(316 / 199, 6);
-  await expectDimension(width, resizedWidth);
-  await expectDimension(height, (resizedWidth * 199) / 316);
+  await expectDimension(width, 316);
+  await expectDimension(height, 199);
 
   await page.getByRole('button', { name: 'Фоновый', exact: true }).click();
   await width.fill('280');
@@ -136,7 +136,7 @@ test('manual dimensions preserve proportions and affect only the selected object
   expect((await sceneSize(first, canvas)).width).toBeCloseTo(280, 3);
   expect(await second.getAttribute('transform')).toBe(secondTransform);
   await detail.getByRole('button', { name: 'L', exact: true }).click();
-  expect((await sceneSize(first, canvas)).width).toBeCloseTo(280, 3);
+  expect((await sceneSize(first, canvas)).width).toBeCloseTo(631, 3);
   expect((await first.getAttribute('transform'))!.split(' scale(')[0]).toBe(
     originalTransform!.split(' scale(')[0],
   );

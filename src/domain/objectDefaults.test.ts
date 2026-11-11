@@ -19,13 +19,9 @@ function library(id: ObjectId, width: number, height: number): LibraryManifest {
 }
 
 describe('default object sizes', () => {
-  it('preserves the established built-in scale and the original relative sizes', () => {
-    expect(getDefaultObjectScale('book', library('book', 1446, 977))).toBe(
-      0.35,
-    );
-    expect(getDefaultObjectScale('lamp', library('lamp', 946, 1129))).toBe(
-      0.35,
-    );
+  it('uses the native size of built-in sources at 100%', () => {
+    expect(getDefaultObjectScale('book', library('book', 1446, 977))).toBe(1);
+    expect(getDefaultObjectScale('lamp', library('lamp', 946, 1129))).toBe(1);
   });
 
   it.each([
@@ -33,14 +29,16 @@ describe('default object sizes', () => {
     [10, 1000],
     [12000, 6000],
   ])(
-    'fits an imported %s × %s source to the same initial 250-unit longer side',
+    'keeps an imported %s × %s source at its actual viewport size',
     (width, height) => {
       const manifest = library('custom-icon', width, height);
       const before = structuredClone(manifest);
       const scale = getDefaultObjectScale('custom-icon', manifest);
       const item = { ...createSceneItem('custom-icon', 'imported'), scale };
       const geometry = getObjectGeometry(item, manifest);
-      expect(Math.max(geometry.width, geometry.height)).toBeCloseTo(250);
+      expect(geometry.width).toBeCloseTo(width);
+      expect(geometry.height).toBeCloseTo(height);
+      expect(scale).toBe(1);
       expect(geometry.width / geometry.height).toBeCloseTo(width / height);
       expect(manifest).toEqual(before);
     },

@@ -85,22 +85,22 @@ describe('SceneStore automatic composition', () => {
     });
     expect(store.scene.items.map((item) => item.assetId)).toEqual([
       'lamp',
-      'book',
       'phone',
+      'book',
     ]);
     expect(
       store.scene.items.map(({ size, role, scale }) => ({ size, role, scale })),
     ).toEqual([
-      { size: 'S', role: 'bg', scale: 0.35 },
-      { size: 'S', role: 'main', scale: 0.35 },
-      { size: 'L', role: 'main', scale: 0.35 },
+      { size: 'S', role: 'bg', scale: 1 },
+      { size: 'L', role: 'main', scale: 1 },
+      { size: 'S', role: 'main', scale: 1 },
     ]);
     const book = store.scene.items.find(({ assetId }) => assetId === 'book')!;
     const geometry = getObjectGeometry(book, library());
     expect(geometry.viewBox).toEqual([37, -11, 723, 430]);
     expect(geometry.asset.svg).toContain('M37 -11L760 419Z');
-    expect(geometry.width).toBeCloseTo(506.1);
-    expect(geometry.height).toBeCloseTo(301);
+    expect(geometry.width).toBeCloseTo(723);
+    expect(geometry.height).toBeCloseTo(430);
     expect(store.scene.items.map((item) => item.id)).not.toContain(oldId);
     expect(store.selectedItem).toBeUndefined();
     store.selectItem(store.scene.items[0].id);
@@ -126,7 +126,7 @@ describe('SceneStore automatic composition', () => {
     expect(issued.has(store.selectedItemId!)).toBe(false);
   });
 
-  it('preserves the full scene and selection when validation or fixed-size placement fails', () => {
+  it('preserves the full scene and selection when plan or geometry validation fails', () => {
     const store = new SceneStore(
       { ...createScene(), width: 300, height: 300 },
       library,
@@ -136,7 +136,6 @@ describe('SceneStore automatic composition', () => {
     const snapshot = toJS(store.scene);
     const selected = store.selectedItem;
     for (const requested of [
-      plan(),
       { ...plan(), items: [] },
       {
         ...plan(),
@@ -172,8 +171,8 @@ describe('SceneStore automatic composition', () => {
       expect(
         store.scene.items.map(({ assetId, size }) => ({ assetId, size })),
       ).toEqual([
-        { assetId: 'book', size: 'S' },
         { assetId: 'phone', size: 'L' },
+        { assetId: 'book', size: 'S' },
         { assetId: 'lamp', size: 'S' },
       ]);
       expect(store.selectedItem).toBeUndefined();
@@ -200,7 +199,7 @@ describe('SceneStore automatic composition', () => {
     });
     expect(store.scene.items[0].scale).toBe(manual.scale);
     const geometry = getObjectGeometry(store.scene.items[0], manifest);
-    expect(geometry.width).toBeCloseTo(250);
-    expect(geometry.height).toBeCloseTo(125);
+    expect(geometry.width).toBeCloseTo(24);
+    expect(geometry.height).toBeCloseTo(12);
   });
 });

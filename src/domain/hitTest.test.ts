@@ -19,8 +19,8 @@ function asset(size: 'L' | 'S'): LibraryAsset {
     size,
     kind: 'object',
     sourceScheme: 'purple',
-    width: width * 2,
-    height: height * 2,
+    width,
+    height,
     viewBox,
     // Most of the imported viewport is deliberately blank.
     svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}"><circle cx="${size === 'L' ? -38 : 22}" cy="${size === 'L' ? 32 : -8}" r="1"/></svg>`,
@@ -137,23 +137,22 @@ describe('scene object picking', () => {
     );
   });
 
-  it('uses independent L and S proportions, uniform scale and offset viewBox origins', () => {
+  it('picks independent native source viewports after manual scaling', () => {
     const large = object();
-    const small = object({ size: 'S' });
+    const small = object({ size: 'S', scale: 1 });
     const manifest = library();
-    // Both are 100 units wide. Only S is tall enough to include y = 230.
     expect(
-      getSceneItemAtPoint(scene(large), manifest, { x: 349, y: 230 }),
+      getSceneItemAtPoint(scene(large), manifest, { x: 339, y: 229 }),
     ).toBeUndefined();
     expect(
-      getSceneItemAtPoint(scene(small), manifest, { x: 349, y: 230 }),
+      getSceneItemAtPoint(scene(small), manifest, { x: 339, y: 229 }),
     ).toBe(small);
-    const scaled = object({ size: 'S', scale: 1 });
+    const scaled = object({ size: 'S', scale: 2 });
     expect(
-      getSceneItemAtPoint(scene(scaled), manifest, { x: 400, y: 275 }),
+      getSceneItemAtPoint(scene(scaled), manifest, { x: 380, y: 260 }),
     ).toBe(scaled);
     expect(
-      getSceneItemAtPoint(scene(scaled), manifest, { x: 400.001, y: 275 }),
+      getSceneItemAtPoint(scene(scaled), manifest, { x: 380.001, y: 260 }),
     ).toBeUndefined();
   });
 

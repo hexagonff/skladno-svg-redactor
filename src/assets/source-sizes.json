@@ -1,0 +1,132 @@
+{
+  "vase": {
+    "L": {
+      "width": 591,
+      "height": 748
+    },
+    "S": {
+      "width": 324,
+      "height": 409
+    }
+  },
+  "book": {
+    "L": {
+      "width": 1446,
+      "height": 977
+    },
+    "S": {
+      "width": 723,
+      "height": 489
+    }
+  },
+  "wallet": {
+    "L": {
+      "width": 631,
+      "height": 397
+    },
+    "S": {
+      "width": 316,
+      "height": 199
+    }
+  },
+  "lamp": {
+    "L": {
+      "width": 946,
+      "height": 1129
+    },
+    "S": {
+      "width": 473,
+      "height": 565
+    }
+  },
+  "coin": {
+    "L": {
+      "width": 287,
+      "height": 189
+    },
+    "S": {
+      "width": 153,
+      "height": 101
+    }
+  },
+  "headphones": {
+    "L": {
+      "width": 889,
+      "height": 692
+    },
+    "S": {
+      "width": 445,
+      "height": 346
+    }
+  },
+  "puzzle": {
+    "L": {
+      "width": 545,
+      "height": 314
+    },
+    "S": {
+      "width": 273,
+      "height": 157
+    }
+  },
+  "folder": {
+    "L": {
+      "width": 1241,
+      "height": 659
+    },
+    "S": {
+      "width": 621,
+      "height": 330
+    }
+  },
+  "pen": {
+    "L": {
+      "width": 509,
+      "height": 286
+    },
+    "S": {
+      "width": 255,
+      "height": 143
+    }
+  },
+  "phone": {
+    "L": {
+      "width": 797,
+      "height": 462
+    },
+    "S": {
+      "width": 399,
+      "height": 231
+    }
+  },
+  "canvas1": {
+    "L": {
+      "width": 1000,
+      "height": 1000
+    },
+    "S": {
+      "width": 500,
+      "height": 500
+    }
+  },
+  "canvas2": {
+    "L": {
+      "width": 1000,
+      "height": 1000
+    },
+    "S": {
+      "width": 500,
+      "height": 500
+    }
+  },
+  "canvas3": {
+    "L": {
+      "width": 1000,
+      "height": 1000
+    },
+    "S": {
+      "width": 500,
+      "height": 500
+    }
+  }
+}

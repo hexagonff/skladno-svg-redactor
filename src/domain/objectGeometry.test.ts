@@ -44,7 +44,7 @@ function expectPoint(actual: Point, expected: Point): void {
 }
 
 describe('object geometry', () => {
-  it('normalizes L and S to the same displayed width while preserving each source artwork', () => {
+  it('keeps independent native L and S dimensions without width normalization', () => {
     const manifest = library();
     const source = structuredClone(manifest);
     const large = getObjectGeometry(object(), manifest);
@@ -56,9 +56,9 @@ describe('object geometry', () => {
       viewBox: [0, 0, 200, 100],
     });
     expect(small).toMatchObject({
-      width: 100,
-      height: 60,
-      scale: 1,
+      width: 50,
+      height: 30,
+      scale: 0.5,
       viewBox: [0, 0, 100, 60],
     });
     expect(large.asset).toBe(manifest.assets[0]);
@@ -66,7 +66,7 @@ describe('object geometry', () => {
     expect(manifest).toEqual(source);
   });
 
-  it('uses viewBox dimensions and preserves an offset origin', () => {
+  it('keeps the native viewport dimensions and a distinct offset viewBox', () => {
     const manifest = library();
     manifest.assets[0] = {
       ...manifest.assets[0],
@@ -76,8 +76,8 @@ describe('object geometry', () => {
     };
     expect(getObjectGeometry(object(), manifest)).toMatchObject({
       viewBox: [-5, 7, 200, 100],
-      width: 100,
-      height: 50,
+      width: 200,
+      height: 100,
     });
   });
 
@@ -91,7 +91,7 @@ describe('object geometry', () => {
       'width',
       250,
     );
-    expect(widthScale).toBe(1.25);
+    expect(widthScale).toBe(2.5);
     expect(
       getObjectGeometry({ ...small, scale: widthScale }, manifest),
     ).toMatchObject({ width: 250, height: 150 });
@@ -101,7 +101,7 @@ describe('object geometry', () => {
       'height',
       75,
     );
-    expect(heightScale).toBe(0.625);
+    expect(heightScale).toBe(1.25);
     expect(
       getObjectGeometry({ ...small, scale: heightScale }, manifest),
     ).toMatchObject({ width: 125, height: 75 });
@@ -146,13 +146,15 @@ describe('object geometry', () => {
     });
   });
 
-  it('requires unique, correctly typed assets for both the selected detail and L reference', () => {
+  it('validates the selected source and does not require unused L metadata for S', () => {
     const manifest = library();
     const small = object({ size: 'S' });
+    expect(
+      getObjectGeometry(small, { version: 1, assets: [manifest.assets[1]] })
+        .width,
+    ).toBe(50);
     for (const assets of [
-      [manifest.assets[1]],
       [manifest.assets[0]],
-      [...manifest.assets, manifest.assets[0]],
       [...manifest.assets, manifest.assets[1]],
       [manifest.assets[0], { ...manifest.assets[1], kind: 'canvas' as const }],
     ]) {
@@ -171,7 +173,7 @@ describe('object geometry', () => {
     '',
   ])('rejects invalid viewBox %j', (viewBox) => {
     const manifest = library();
-    manifest.assets[0].viewBox = viewBox;
+    manifest.assets[1].viewBox = viewBox;
     expect(() => getObjectGeometry(object({ size: 'S' }), manifest)).toThrow(
       /Invalid SVG geometry/,
     );

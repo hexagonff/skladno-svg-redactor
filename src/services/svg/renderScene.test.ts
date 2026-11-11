@@ -12,6 +12,7 @@ import type {
   LibraryManifest,
 } from '../../domain/library';
 import {
+  createScene,
   createSceneItem,
   setSceneItemLayer,
   type Scene,
@@ -450,7 +451,7 @@ describe('renderScene', () => {
     },
   );
 
-  it('switches one object to its independent S geometry without changing its displayed width, pose or the underlay', () => {
+  it('switches one object to its independent S geometry at its own native size without changing pose or the underlay', () => {
     const large = renderScene(scene, manifest, schemes, 'scene');
     const small = renderScene(
       { ...scene, items: [{ ...scene.items[0], size: 'S' }] },
@@ -462,7 +463,7 @@ describe('renderScene', () => {
       'translate(400 600) rotate(15) scale(0.5) translate(-398.5 -231)',
     );
     expect(itemGroup(small).getAttribute('transform')).toBe(
-      `translate(400 600) rotate(15) scale(${0.5 * (797 / 399)}) translate(-199.5 -115.5)`,
+      `translate(400 600) rotate(15) scale(0.5) translate(-199.5 -115.5)`,
     );
     expect(itemGroup(large).getElementsByTagName('path').length).toBe(155);
     expect(itemGroup(small).getElementsByTagName('path').length).toBe(96);
@@ -493,7 +494,7 @@ describe('renderScene', () => {
     'preserves each %s source geometry and uniform proportions at default and manual scales in both detail levels',
     (assetId, largeWidth, largeHeight, smallWidth, smallHeight) => {
       const defaultItem = createSceneItem(assetId, 'first');
-      expect(defaultItem.scale).toBe(0.35);
+      expect(defaultItem.scale).toBe(1);
       for (const scale of [defaultItem.scale, 0.8]) {
         for (const [size, width, height] of [
           ['L', largeWidth, largeHeight],
@@ -512,7 +513,7 @@ describe('renderScene', () => {
           );
           const group = itemGroup(svg);
           const viewport = group.getElementsByTagName('svg')[0];
-          const effectiveScale = scale * (largeWidth / width);
+          const effectiveScale = scale;
           expect(group.getAttribute('transform')).toBe(
             `translate(400 600) rotate(15) scale(${effectiveScale}) translate(${-width / 2} ${-height / 2})`,
           );
@@ -521,7 +522,7 @@ describe('renderScene', () => {
           expect(viewport.getAttribute('viewBox')).toBe(
             `0 0 ${width} ${height}`,
           );
-          expect(width * effectiveScale).toBeCloseTo(largeWidth * scale, 8);
+          expect(width * effectiveScale).toBeCloseTo(width * scale, 8);
           expect(group.getAttribute('transform')).toMatch(/scale\([-\d.e+]+\)/);
           expect(group.getAttribute('transform')).not.toMatch(
             /scale\([^)]*[, ]/,
@@ -572,7 +573,7 @@ describe('renderScene', () => {
       'mixed-sizes',
     );
     expect(itemGroup(svg).getAttribute('transform')).toBe(
-      `translate(400 600) rotate(15) scale(${631 / 316}) translate(-158 -99.5)`,
+      `translate(400 600) rotate(15) scale(1) translate(-158 -99.5)`,
     );
     expect(itemGroup(svg, 'second').getAttribute('transform')).toBe(
       'translate(800 200) rotate(-30) scale(0.75) translate(-315.5 -198.5)',
@@ -631,7 +632,7 @@ describe('renderScene', () => {
     expect(itemPaints(after)).not.toContain(purple.colors.bg1);
   });
 
-  it('renders independent S paths and uses only L geometry metadata to normalize its display size', () => {
+  it('renders independent S paths without requiring any L source metadata', () => {
     const svg = renderScene(
       { ...scene, items: [{ ...scene.items[0], size: 'S' }] },
       {
@@ -658,7 +659,7 @@ describe('renderScene', () => {
         schemes,
         'missing-large-metadata',
       ),
-    ).toThrow(/object asset: phone__L/);
+    ).not.toThrow();
   });
 
   it.each(['canvas1', 'canvas2', 'canvas3'] as const)(
@@ -734,7 +735,7 @@ describe('renderScene', () => {
         'rectangular',
       );
       expect(itemGroup(svg).getAttribute('transform')).toBe(
-        'translate(400 600) rotate(15) scale(1) translate(-110 -25)',
+        'translate(400 600) rotate(15) scale(0.5) translate(-110 -25)',
       );
       const nested = itemGroup(svg).getElementsByTagName('svg')[0];
       expect(
@@ -1379,5 +1380,52 @@ describe('rendering session palettes', () => {
         .getElementsByTagName('rect')[0]
         .getAttribute('fill'),
     ).toBe('white');
+  });
+});
+
+describe('native source viewport sizes', () => {
+  it('keeps declared SVG dimensions even when viewBox uses a different coordinate scale', () => {
+    const source: LibraryAsset = {
+      ...assetFor('phone'),
+      id: 'custom-native',
+      width: 400,
+      height: 200,
+      viewBox: '10 20 200 100',
+      svg: '<svg width="400" height="200" viewBox="10 20 200 100"><path d="M10 20h200v100H10Z" fill="var(--obj1)"/></svg>',
+    };
+    const output = renderScene(
+      { ...createScene(), items: [createSceneItem('custom-native', 'native')] },
+      { version: 1, assets: [assetFor('canvas1'), source] },
+      schemes,
+      'native-viewport',
+    );
+    const group = itemGroup(output, 'native');
+    expect(group.getAttribute('transform')).toBe(
+      'translate(500 500) rotate(0) scale(1) translate(-210 -120)',
+    );
+    const viewport = group.getElementsByTagName('svg')[0];
+    expect(viewport.getAttribute('width')).toBe('400');
+    expect(viewport.getAttribute('height')).toBe('200');
+    expect(viewport.getAttribute('viewBox')).toBe('10 20 200 100');
+    expect(group.getElementsByTagName('path')[0].getAttribute('d')).toBe(
+      'M10 20h200v100H10Z',
+    );
+  });
+
+  it('exports the small background at its actual 500 by 500 size without enlarging its source', () => {
+    const output = renderScene(
+      { ...createScene(), width: 500, height: 500, canvasSize: 'S' },
+      manifest,
+      schemes,
+      'native-background',
+    );
+    const root = parseSvg(output).documentElement!;
+    expect(root.getAttribute('viewBox')).toBe('0 0 500 500');
+    const group = elements(output, 'g').find((element) =>
+      element.hasAttribute('data-canvas-id'),
+    )!;
+    expect(group.getAttribute('transform')).toBe(
+      'translate(250 250) scale(1) translate(-250 -250)',
+    );
   });
 });

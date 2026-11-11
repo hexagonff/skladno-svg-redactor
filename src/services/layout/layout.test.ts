@@ -28,10 +28,14 @@ function library(): LibraryManifest {
     assets: [
       asset('book', 1446, 977),
       asset('phone', 797, 462),
+      { ...asset('phone', 399, 231), size: 'S' },
       asset('lamp', 946, 1129),
       asset('vase', 591, 748),
+      { ...asset('vase', 324, 409), size: 'S' },
       asset('folder', 1241, 659),
+      { ...asset('folder', 621, 330), size: 'S' },
       asset('pen', 509, 286),
+      { ...asset('pen', 255, 143), size: 'S' },
       asset('custom-icon', 24, 12),
       {
         ...asset('book', 723, 430),
@@ -58,7 +62,7 @@ function plan(): CompositionPlan {
     ],
   };
 }
-function expectReadable(result: Scene, manifest: LibraryManifest): void {
+function expectVisible(result: Scene, manifest: LibraryManifest): void {
   const bounds = result.items.map((item) => {
     const geometry = getObjectGeometry(item, manifest);
     return {
@@ -69,26 +73,91 @@ function expectReadable(result: Scene, manifest: LibraryManifest): void {
     };
   });
   for (const box of bounds) {
-    expect(box.left).toBeGreaterThanOrEqual(0);
-    expect(box.right).toBeLessThanOrEqual(result.width);
-    expect(box.top).toBeGreaterThanOrEqual(0);
-    expect(box.bottom).toBeLessThanOrEqual(result.height);
-  }
-  for (let first = 0; first < bounds.length; first += 1) {
-    for (let second = first + 1; second < bounds.length; second += 1) {
-      const a = bounds[first];
-      const b = bounds[second];
-      expect(
-        a.right < b.left ||
-          b.right < a.left ||
-          a.bottom < b.top ||
-          b.bottom < a.top,
-      ).toBe(true);
-    }
+    expect(Math.min(result.width, box.right)).toBeGreaterThan(
+      Math.max(0, box.left),
+    );
+    expect(Math.min(result.height, box.bottom)).toBeGreaterThan(
+      Math.max(0, box.top),
+    );
   }
 }
 
 describe('fixed-size composition layout', () => {
+  it('preserves selected L even when S is available and L extends beyond the canvas', () => {
+    const manifest = library();
+    const result = composeScene(createScene(), manifest, {
+      message: 'Native book',
+      items: [{ assetId: 'book', role: 'main', size: 'L' }],
+    });
+    const book = result.items[0];
+    expect(book.size).toBe('L');
+    expect(book.scale).toBe(1);
+    expect(getObjectGeometry(book, manifest)).toMatchObject({
+      width: 1446,
+      height: 977,
+      scale: 1,
+    });
+    expect(book.x - 1446 / 2).toBeLessThan(0);
+    expect(book.x + 1446 / 2).toBeGreaterThan(result.width);
+    expectVisible(result, manifest);
+  });
+
+  it('permits partial overlap while preserving all selected objects and their exact source sizes', () => {
+    const manifest = library();
+    const result = composeScene(createScene(), manifest, {
+      ...plan(),
+      items: plan().items.map((item) => ({ ...item, size: 'S' })),
+    });
+    expectVisible(result, manifest);
+    expect(result.items).toHaveLength(3);
+    for (const item of result.items) {
+      const source = manifest.assets.find(
+        (asset) => asset.id === item.assetId && asset.size === item.size,
+      )!;
+      expect(getObjectGeometry(item, manifest)).toMatchObject({
+        width: source.width,
+        height: source.height,
+        scale: 1,
+      });
+    }
+    const boxes = result.items.map((item) => ({
+      item,
+      geometry: getObjectGeometry(item, manifest),
+    }));
+    expect(
+      boxes.some((a, index) =>
+        boxes
+          .slice(index + 1)
+          .some(
+            (b) =>
+              Math.abs(a.item.x - b.item.x) <
+                (a.geometry.width + b.geometry.width) / 2 &&
+              Math.abs(a.item.y - b.item.y) <
+                (a.geometry.height + b.geometry.height) / 2,
+          ),
+      ),
+    ).toBe(true);
+  });
+
+  it('keeps enough-space compositions separate at native size', () => {
+    const manifest = library();
+    const result = composeScene(createScene(), manifest, {
+      message: 'Two small sources',
+      items: [
+        { assetId: 'pen', role: 'main', size: 'S' },
+        { assetId: 'custom-icon', role: 'bg', size: 'L' },
+      ],
+    });
+    const [a, b] = result.items;
+    const ga = getObjectGeometry(a, manifest),
+      gb = getObjectGeometry(b, manifest);
+    expect(
+      Math.abs(a.x - b.x) >= (ga.width + gb.width) / 2 ||
+        Math.abs(a.y - b.y) >= (ga.height + gb.height) / 2,
+    ).toBe(true);
+    expect(result.items.every((item) => item.scale === 1)).toBe(true);
+  });
+
   it('replaces objects without mutating input data or changing canvas, palette, and proportions', () => {
     const source = {
       ...createScene(),
@@ -124,11 +193,11 @@ describe('fixed-size composition layout', () => {
       'main',
     ]);
     for (const item of result.items) {
-      expect(item).toMatchObject({ scale: 0.35, size: 'L', rotation: 0 });
+      expect(item).toMatchObject({ scale: 1, rotation: 0 });
       expect(item.colorOverrides).toBeUndefined();
       expect(item.id).not.toBe('composition-1');
     }
-    expectReadable(result, manifest);
+    expectVisible(result, manifest);
   });
 
   it.each([0, 1, 2, 3, 7, 999])(
@@ -145,8 +214,8 @@ describe('fixed-size composition layout', () => {
       };
       const result = composeScene(createScene(), library(), requested, seed);
       expect(result.items).toHaveLength(6);
-      expectReadable(result, library());
-      expect(result.items.every((item) => item.scale === 0.35)).toBe(true);
+      expectVisible(result, library());
+      expect(result.items.every((item) => item.scale === 1)).toBe(true);
       expect(result.items.slice(0, 2).every((item) => item.role === 'bg')).toBe(
         true,
       );
@@ -174,9 +243,9 @@ describe('fixed-size composition layout', () => {
         scale,
       })),
     ).toEqual([
-      { assetId: 'lamp', role: 'bg', size: 'S', scale: 0.35 },
-      { assetId: 'book', role: 'main', size: 'S', scale: 0.35 },
-      { assetId: 'phone', role: 'main', size: 'L', scale: 0.35 },
+      { assetId: 'lamp', role: 'bg', size: 'S', scale: 1 },
+      { assetId: 'phone', role: 'main', size: 'L', scale: 1 },
+      { assetId: 'book', role: 'main', size: 'S', scale: 1 },
     ]);
     const book = result.items.find(({ assetId }) => assetId === 'book')!;
     const geometry = getObjectGeometry(book, manifest);
@@ -190,11 +259,11 @@ describe('fixed-size composition layout', () => {
     expect(geometry.viewBox).toEqual([37, -11, 723, 430]);
     expect(geometry.asset.svg).toBe(suppliedSmall.svg);
     expect(geometry.asset.svg).not.toBe(suppliedLarge.svg);
-    expect(geometry.width).toBeCloseTo(506.1);
-    expect(geometry.height).toBeCloseTo(301);
-    expect(geometry.scale).toBeCloseTo(0.7);
+    expect(geometry.width).toBeCloseTo(723);
+    expect(geometry.height).toBeCloseTo(430);
+    expect(geometry.scale).toBe(1);
     expect(geometry.width / 723).toBeCloseTo(geometry.height / 430);
-    expectReadable(result, manifest);
+    expectVisible(result, manifest);
   });
 
   it.each([
@@ -228,7 +297,7 @@ describe('fixed-size composition layout', () => {
         ...roles.filter((role) => role === 'main'),
       ]);
       expect(new Set(result.items.map(({ assetId }) => assetId)).size).toBe(4);
-      expectReadable(result, library());
+      expectVisible(result, library());
     },
   );
 
@@ -271,18 +340,18 @@ describe('fixed-size composition layout', () => {
   });
 
   it.each([
-    { width: 700, height: 1200 },
+    { width: 800, height: 1200 },
     { width: 1400, height: 650 },
   ])(
-    'uses rows or columns in a $width × $height format without rescaling',
+    'preserves selected sources in a $width × $height format without rescaling',
     ({ width, height }) => {
       const result = composeScene(
         { ...createScene(), width, height },
         library(),
         plan(),
       );
-      expectReadable(result, library());
-      expect(result.items.every((item) => item.scale === 0.35)).toBe(true);
+      expectVisible(result, library());
+      expect(result.items.every((item) => item.scale === 1)).toBe(true);
     },
   );
 
@@ -295,12 +364,12 @@ describe('fixed-size composition layout', () => {
     const item = result.items[0];
     expect(item).toMatchObject({ x: 500, y: 500, size: 'L', role: 'main' });
     const geometry = getObjectGeometry(item, library());
-    expect(geometry.width).toBeCloseTo(250);
-    expect(geometry.height).toBeCloseTo(125);
-    expectReadable(result, library());
+    expect(geometry.width).toBeCloseTo(24);
+    expect(geometry.height).toBeCloseTo(12);
+    expectVisible(result, library());
   });
 
-  it('fails with actionable feedback instead of dropping or shrinking objects that do not fit', () => {
+  it('keeps all oversized sources on a small canvas without changing the original scene', () => {
     const source = {
       ...createScene(),
       width: 300,
@@ -308,10 +377,77 @@ describe('fixed-size composition layout', () => {
       items: [createSceneItem('pen', 'keep')],
     };
     const before = structuredClone(source);
-    expect(() => composeScene(source, library(), plan())).toThrow(
-      /исходных размерах.*формат.*меньше объектов/,
-    );
+    const result = composeScene(source, library(), plan());
     expect(source).toEqual(before);
+    expect(result.items).toHaveLength(3);
+    expect(
+      result.items.every((item) => item.size === 'L' && item.scale === 1),
+    ).toBe(true);
+    expectVisible(result, library());
+  });
+
+  it.each(['main', 'bg'] as const)(
+    'places smaller %s sources above a source covering the entire canvas',
+    (role) => {
+      const manifest: LibraryManifest = {
+        version: 1,
+        assets: [
+          asset('custom-large', 2400, 1800),
+          asset('custom-small', 100, 80),
+        ],
+      };
+      const result = composeScene(
+        { ...createScene(), width: 500, height: 500, canvasSize: 'S' },
+        manifest,
+        {
+          message: 'Large source with a small accent',
+          items: [
+            { assetId: 'custom-small', role },
+            { assetId: 'custom-large', role },
+          ],
+        },
+      );
+      expect(result.items.map((item) => item.assetId)).toEqual([
+        'custom-large',
+        'custom-small',
+      ]);
+      const [large, small] = result.items;
+      expect(large).toMatchObject({ size: 'L', scale: 1 });
+      expect(small).toMatchObject({ size: 'L', scale: 1 });
+      expect(small.x - 50).toBeGreaterThanOrEqual(0);
+      expect(small.y - 40).toBeGreaterThanOrEqual(0);
+      expect(small.x + 50).toBeLessThanOrEqual(500);
+      expect(small.y + 40).toBeLessThanOrEqual(500);
+      expect(
+        Math.abs(large.x - small.x) < (2400 + 100) / 2 &&
+          Math.abs(large.y - small.y) < (1800 + 80) / 2,
+      ).toBe(true);
+      expect(large.x).toBeGreaterThanOrEqual(0);
+      expect(large.x).toBeLessThanOrEqual(500);
+      expect(large.y).toBeGreaterThanOrEqual(0);
+      expect(large.y).toBeLessThanOrEqual(500);
+      expectVisible(result, manifest);
+    },
+  );
+
+  it('uses free canvas space around an oversized source when an accent can fit there', () => {
+    const manifest: LibraryManifest = {
+      version: 1,
+      assets: [asset('custom-wide', 1200, 220), asset('custom-small', 100, 80)],
+    };
+    const result = composeScene(createScene(), manifest, {
+      message: 'Wide source with a small accent',
+      items: [
+        { assetId: 'custom-small', role: 'main' },
+        { assetId: 'custom-wide', role: 'main' },
+      ],
+    });
+    const [wide, small] = result.items;
+    expect(wide.assetId).toBe('custom-wide');
+    expect(wide.size).toBe('L');
+    expect(wide.scale).toBe(1);
+    expect(Math.abs(wide.y - small.y)).toBeGreaterThanOrEqual((220 + 80) / 2);
+    expectVisible(result, manifest);
   });
 
   it('rejects empty plans, missing objects, ambiguous geometry, and malformed plans', () => {

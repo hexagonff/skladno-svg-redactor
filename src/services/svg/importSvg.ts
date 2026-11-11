@@ -484,10 +484,10 @@ export function inspectImportedSvg(source: string): InspectedImportedSvg {
     invalid('В SVG должно быть не больше 64 разных цветов.');
   const sourceBox = root.getAttribute('viewBox');
   let box = sourceBox ? numberList(sourceBox, 'viewBox') : undefined;
-  let width = root.hasAttribute('width')
+  const width = root.hasAttribute('width')
     ? numeric(root.getAttribute('width')!, 'width', 0)
     : box?.[2];
-  let height = root.hasAttribute('height')
+  const height = root.hasAttribute('height')
     ? numeric(root.getAttribute('height')!, 'height', 0)
     : box?.[3];
   if (
@@ -502,9 +502,7 @@ export function inspectImportedSvg(source: string): InspectedImportedSvg {
     );
   }
   box ??= [0, 0, width, height];
-  // Match the root viewport to its own viewBox without changing source proportions.
-  width = box[2];
-  height = box[3];
+  // Keep the source viewport size; its viewBox preserves the source proportions.
   root.setAttribute('width', String(width));
   root.setAttribute('height', String(height));
   root.setAttribute('viewBox', box.join(' '));

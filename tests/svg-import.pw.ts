@@ -84,8 +84,8 @@ test('uploaded SVG retains its own viewBox, colors and proportions in independen
     'viewBox',
     '10 20 200 100',
   );
-  await expect(first.locator('svg')).toHaveAttribute('width', '200');
-  await expect(first.locator('svg')).toHaveAttribute('height', '100');
+  await expect(first.locator('svg')).toHaveAttribute('width', '400');
+  await expect(first.locator('svg')).toHaveAttribute('height', '400');
   await expect(first.locator('g[clip-path] > rect')).toHaveAttribute(
     'fill',
     '#D7CDF5',
@@ -96,7 +96,7 @@ test('uploaded SVG retains its own viewBox, colors and proportions in independen
     '#FFFFFF',
   );
   const detail = page.getByRole('group', {
-    name: 'Детализация объекта',
+    name: 'Размер исходника объекта',
     exact: true,
   });
   await expect(
@@ -108,7 +108,7 @@ test('uploaded SVG retains its own viewBox, colors and proportions in independen
   await expect(width).toHaveValue('300');
   await expect(
     page.getByRole('spinbutton', { name: 'Высота', exact: true }),
-  ).toHaveValue('150');
+  ).toHaveValue('300');
   const firstBounds = await svgViewportBounds(first.locator('svg'));
   const secondBounds = await svgViewportBounds(second.locator('svg'));
   const boardBounds = await svgViewportBounds(canvas.locator('svg').first());
@@ -126,7 +126,7 @@ test('uploaded SVG retains its own viewBox, colors and proportions in independen
     );
   }
   expect(secondBounds.width / secondBounds.height).toBeCloseTo(2, 6);
-  expect(secondBounds.width / firstBounds.width).toBeCloseTo(300 / 250, 6);
+  expect(secondBounds.width / firstBounds.width).toBeCloseTo(300 / 400, 6);
   await page
     .getByRole('group', { name: 'Используемые цвета', exact: true })
     .getByRole('button', { name: 'Участок 1', exact: true })
@@ -408,7 +408,7 @@ test('automatic SVG import and resulting object remain usable on a narrow screen
     .click();
   await expect(
     page
-      .getByRole('group', { name: 'Детализация объекта', exact: true })
+      .getByRole('group', { name: 'Размер исходника объекта', exact: true })
       .getByRole('button', { name: 'S', exact: true }),
   ).toBeDisabled();
   const width = page.getByRole('spinbutton', { name: 'Ширина', exact: true });
@@ -416,7 +416,7 @@ test('automatic SVG import and resulting object remain usable on a narrow screen
   await width.press('Enter');
   await expect(
     page.getByRole('spinbutton', { name: 'Высота', exact: true }),
-  ).toHaveValue('130');
+  ).toHaveValue('260');
   await expectNoHorizontalOverflow(page);
   await page.screenshot({
     path: testInfo.outputPath('svg-import-scene-mobile.png'),

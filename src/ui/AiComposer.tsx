@@ -11,10 +11,16 @@ import './AiComposer.css';
 export interface AiComposerProps {
   catalog: readonly CatalogObject[];
   manifest: LibraryManifest;
+  canvas: { width: number; height: number };
   onApply: (plan: CompositionPlan) => void;
 }
 
-export function AiComposer({ catalog, manifest, onApply }: AiComposerProps) {
+export function AiComposer({
+  catalog,
+  manifest,
+  canvas,
+  onApply,
+}: AiComposerProps) {
   const id = useId();
   const attemptRef = useRef(0);
   const controllerRef = useRef<AbortController | null>(null);
@@ -41,12 +47,13 @@ export function AiComposer({ catalog, manifest, onApply }: AiComposerProps) {
     controllerRef.current = controller;
     setPending(true);
     setError('');
-    setMessage('Подбираем объекты, роли и детализацию…');
+    setMessage('Подбираем объекты, роли и исходные размеры…');
     try {
       const plan = await requestComposition(
         {
           prompt: description,
           catalog: createCompositionCatalog(catalog, manifest),
+          canvas,
         },
         controller.signal,
       );

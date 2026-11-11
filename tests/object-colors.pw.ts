@@ -141,7 +141,7 @@ test('wallet recoloring affects one instance and follows its palette in both siz
   );
   expect(await geometryOf(first)).toBe(originalGeometry);
   await page
-    .getByRole('group', { name: 'Детализация объекта', exact: true })
+    .getByRole('group', { name: 'Размер исходника объекта', exact: true })
     .getByRole('button', { name: 'S', exact: true })
     .click();
   await expect(first).toHaveAttribute('data-detail-size', 'S');
@@ -153,7 +153,7 @@ test('wallet recoloring affects one instance and follows its palette in both siz
   expect(smallPaints['#181817']).toBeGreaterThan(0);
   expect(smallPaints['#FFFFFF']).toBe(originalPaints['#FFFFFF']);
   await page
-    .getByRole('group', { name: 'Детализация объекта', exact: true })
+    .getByRole('group', { name: 'Размер исходника объекта', exact: true })
     .getByRole('button', { name: 'L', exact: true })
     .click();
   expect(await geometryOf(first)).toBe(originalGeometry);

@@ -58,7 +58,7 @@ function viewBoxFor(asset: LibraryAsset): ObjectGeometry['viewBox'] {
   return values as unknown as ObjectGeometry['viewBox'];
 }
 
-/** L and S keep their own proportions and paths, at a common apparent width. */
+/** Each source keeps its own viewport size; scale is only a manual multiplier. */
 export function getObjectGeometry(
   item: SceneItem,
   manifest: LibraryManifest,
@@ -68,11 +68,9 @@ export function getObjectGeometry(
   }
   const asset = assetFor(manifest, item, item.size);
   const viewBox = viewBoxFor(asset);
-  const large = assetFor(manifest, item, 'L');
-  const largeBox = viewBoxFor(large);
-  const scale = item.scale * (largeBox[2] / viewBox[2]);
-  const width = viewBox[2] * scale;
-  const height = viewBox[3] * scale;
+  const scale = item.scale;
+  const width = asset.width * scale;
+  const height = asset.height * scale;
   if (
     ![scale, width, height].every(
       (value) => Number.isFinite(value) && value > 0,
@@ -83,7 +81,7 @@ export function getObjectGeometry(
   return { asset, viewBox, width, height, scale };
 }
 
-/** Return a canonical L-based scale; changing one dimension preserves proportions. */
+/** Return a manual scale relative to this source; dimensions stay proportional. */
 export function getObjectScaleForDimension(
   item: SceneItem,
   manifest: LibraryManifest,

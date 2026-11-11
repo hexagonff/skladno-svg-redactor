@@ -47,7 +47,7 @@ test('library to scene, object detail, palette, role and editable SVG download',
   const originalBounds = await svgViewportBounds(item.locator('svg').first());
 
   await page
-    .getByRole('group', { name: 'Детализация объекта', exact: true })
+    .getByRole('group', { name: 'Размер исходника объекта', exact: true })
     .getByRole('button', { name: 'S', exact: true })
     .click();
   await expect(item.locator('path')).toHaveCount(51);
@@ -58,9 +58,9 @@ test('library to scene, object detail, palette, role and editable SVG download',
   const smallBounds = await svgViewportBounds(item.locator('svg').first());
   expect(originalBounds).not.toBeNull();
   expect(smallBounds).not.toBeNull();
-  expect(smallBounds!.width / originalBounds!.width).toBeCloseTo(1, 4);
+  expect(smallBounds!.width / originalBounds!.width).toBeCloseTo(0.5, 4);
   expect(smallBounds!.height / originalBounds!.height).toBeCloseTo(
-    (489 * 2) / 977,
+    489 / 977,
     4,
   );
 
@@ -90,7 +90,7 @@ test('library to scene, object detail, palette, role and editable SVG download',
     );
   expect(paints).toEqual(['#D27532', '#FDD7B9']);
   await page
-    .getByRole('group', { name: 'Детализация объекта', exact: true })
+    .getByRole('group', { name: 'Размер исходника объекта', exact: true })
     .getByRole('button', { name: 'L', exact: true })
     .click();
   await expect(item.locator('path')).toHaveCount(53);
@@ -137,7 +137,7 @@ test('all catalogue objects render in their individual detail levels', async ({
   for (let index = 0; index < 10; index += 1) {
     await objectChoices.nth(index).click();
     await page
-      .getByRole('group', { name: 'Детализация объекта', exact: true })
+      .getByRole('group', { name: 'Размер исходника объекта', exact: true })
       .getByRole('button', { name: 'S', exact: true })
       .click();
   }

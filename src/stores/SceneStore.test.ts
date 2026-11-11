@@ -56,13 +56,13 @@ describe('SceneStore', () => {
       x: 500,
       y: 500,
       size: 'L',
-      scale: 0.35,
+      scale: 1,
     });
     expect(store.scene.items[1]).toMatchObject({
       x: 524,
       y: 524,
       size: 'L',
-      scale: 0.35,
+      scale: 1,
     });
     expect(store.selectedItem).toBe(store.scene.items[2]);
   });
@@ -100,18 +100,26 @@ describe('SceneStore', () => {
     store.setScheme('teal');
     expect(store.scene.items.map((item) => item.size)).toEqual(['S', 'L']);
     expect(store.scene.schemeId).toBe('teal');
-    expect(store.scene.items).toEqual([{ ...before[0], size: 'S' }, before[1]]);
+    expect(store.scene.items).toEqual([
+      { ...before[0], size: 'S', scale: 1 },
+      before[1],
+    ]);
     expect(store.selectedItem).toBe(store.scene.items[0]);
     store.setSelectedRole('bg');
     expect(store.selectedItem).toBe(store.scene.items[0]);
     expect(store.selectedItem).toEqual({
       ...before[0],
       size: 'S',
+      scale: 1,
       role: 'bg',
     });
     expect(store.scene.items[1]).toEqual(before[1]);
     store.setSelectedSize('L');
-    expect(store.scene.items[0]).toEqual({ ...before[0], role: 'bg' });
+    expect(store.scene.items[0]).toEqual({
+      ...before[0],
+      scale: 1,
+      role: 'bg',
+    });
   });
 
   it('clears selection and rejects unknown IDs without losing current selection', () => {
@@ -162,6 +170,7 @@ describe('SceneStore', () => {
     store.setSelectedSize('L');
     expect(store.selectedItem).toEqual({
       ...initial.items[0],
+      scale: 1,
       x: -1200,
       y: 1000000,
     });
@@ -418,12 +427,10 @@ describe('SceneStore resizing', () => {
     const before = { ...store.selectedItem! };
     store.setSelectedScale(0.8);
     expect(store.selectedItem).toEqual({ ...before, scale: 0.8 });
-    expect(store.scene.items.find((item) => item.id === first)?.scale).toBe(
-      0.35,
-    );
+    expect(store.scene.items.find((item) => item.id === first)?.scale).toBe(1);
     expect(store.selectedItemId).toBe(second);
     store.setSelectedSize('L');
-    expect(store.selectedItem?.scale).toBe(0.8);
+    expect(store.selectedItem?.scale).toBe(1);
     expect(store.selectedItem?.colorOverrides).toEqual({
       main: { bg1: 'obj1' },
     });
@@ -440,7 +447,7 @@ describe('SceneStore resizing', () => {
     const { resizeItem } = store;
     resizeItem(store.selectedItemId!, 0.7, { x: 600, y: 550 });
     dispose();
-    expect(observed).toEqual(['0.35/500/500', '0.7/600/550']);
+    expect(observed).toEqual(['1/500/500', '0.7/600/550']);
   });
 
   it('does nothing without selection and rejects invalid resizes without replacing the scene', () => {
@@ -1018,7 +1025,7 @@ describe('SceneStore canvas detail selection', () => {
     return { version: 1, assets };
   }
 
-  it('keeps canvas detail independent of objects, selection, background, and palette', () => {
+  it('resizes the canvas from source metadata while keeping native object scales and selection', () => {
     const store = new SceneStore(undefined, library);
     store.addItem('book');
     const first = store.selectedItemId!;
@@ -1026,22 +1033,28 @@ describe('SceneStore canvas detail selection', () => {
     store.addItem('book');
     store.selectItem(first);
     const before = toJS(store.scene);
-    const selected = store.selectedItem;
     const { setCanvasSize } = store;
     setCanvasSize('S');
-    expect(store.scene).toEqual({ ...before, canvasSize: 'S' });
-    expect(store.selectedItem).toBe(selected);
-
+    expect(store.scene).toEqual({
+      ...before,
+      canvasSize: 'S',
+      width: 200,
+      height: 200,
+      items: before.items.map((item) => ({
+        ...item,
+        x: item.x * 0.2,
+        y: item.y * 0.2,
+      })),
+    });
+    expect(store.selectedItemId).toBe(first);
     store.setCanvas('canvas2');
     store.setScheme('orange');
     expect(store.scene.canvasSize).toBe('S');
-    expect(store.scene.items).toEqual(before.items);
-    expect(store.selectedItemId).toBe(first);
-    store.setSelectedSize('L');
-    expect(store.scene.canvasSize).toBe('S');
-    const objects = toJS(store.scene.items);
+    const small = toJS(store.scene.items);
     setCanvasSize('L');
-    expect(store.scene.items).toEqual(objects);
+    expect(store.scene.items).toEqual(
+      small.map((item) => ({ ...item, x: item.x * 5, y: item.y * 5 })),
+    );
     expect(store.scene.canvasId).toBe('canvas2');
     expect(store.scene.schemeId).toBe('orange');
   });
