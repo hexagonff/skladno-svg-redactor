@@ -39,6 +39,7 @@ export interface Scene {
   width: number;
   height: number;
   canvasId: CanvasId;
+  canvasSize: AssetSize;
   schemeId: SchemeId;
   // SVG paint order: the first item is lowest, the last item is highest.
   items: SceneItem[];
@@ -97,6 +98,9 @@ export function assertScene(scene: Scene): void {
   if (!CANVAS_IDS.includes(scene.canvasId)) {
     throw new Error(`Unknown canvas asset: ${scene.canvasId}`);
   }
+  if (!ASSET_SIZES.includes(scene.canvasSize)) {
+    throw new Error(`Unknown canvas size: ${scene.canvasSize}`);
+  }
   if (
     !(SCHEME_IDS as readonly string[]).includes(scene.schemeId) &&
     !isCustomSchemeId(scene.schemeId)
@@ -119,6 +123,7 @@ export function createScene(): Scene {
     width: 1000,
     height: 1000,
     canvasId: 'canvas1',
+    canvasSize: 'L',
     schemeId: 'purple',
     items: [],
   };
@@ -163,6 +168,49 @@ export function addSceneItem(scene: Scene, item: SceneItem): Scene {
     throw new Error(`Duplicate scene item ID: ${item.id}`);
   }
   return { ...scene, items: [...scene.items, cloneSceneItem(item)] };
+}
+
+export function duplicateSceneItem(
+  scene: Scene,
+  sourceId: string,
+  newId: string,
+): Scene {
+  assertScene(scene);
+  const index = scene.items.findIndex((item) => item.id === sourceId);
+  if (index === -1) {
+    throw new Error(`Unknown scene item: ${sourceId}`);
+  }
+  if (typeof newId !== 'string') {
+    throw new Error('Scene item ID must be a safe, nonempty SVG identifier.');
+  }
+  const source = scene.items[index];
+  const offset = Math.min(scene.width, scene.height) * 0.016;
+  const shiftCoordinate = (value: number, extent: number): number => {
+    const step =
+      value >= 0 && value <= extent && value > extent - offset
+        ? -offset
+        : offset;
+    const shifted = value + step;
+    return Number.isFinite(shifted) ? shifted : value - step;
+  };
+  const copy = cloneSceneItem({
+    ...source,
+    id: newId,
+    x: shiftCoordinate(source.x, scene.width),
+    y: shiftCoordinate(source.y, scene.height),
+  });
+  assertItem(copy);
+  if (scene.items.some((item) => item.id === newId)) {
+    throw new Error(`Duplicate scene item ID: ${newId}`);
+  }
+  return {
+    ...scene,
+    items: [
+      ...scene.items.slice(0, index + 1),
+      copy,
+      ...scene.items.slice(index + 1),
+    ],
+  };
 }
 
 export function getSceneItemLayer(scene: Scene, itemId: string): number {
@@ -219,6 +267,14 @@ export function setSceneCanvas(scene: Scene, canvasId: CanvasId): Scene {
     throw new Error(`Unknown canvas asset: ${canvasId}`);
   }
   return { ...scene, canvasId };
+}
+
+export function setSceneCanvasSize(scene: Scene, size: AssetSize): Scene {
+  assertScene(scene);
+  if (!ASSET_SIZES.includes(size)) {
+    throw new Error(`Unknown canvas size: ${size}`);
+  }
+  return { ...scene, canvasSize: size };
 }
 
 export function setSceneScheme(scene: Scene, schemeId: SchemeId): Scene {

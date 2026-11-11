@@ -13,6 +13,7 @@ import {
   cloneSceneItem,
   createScene,
   createSceneItem,
+  duplicateSceneItem,
   getSceneItemLayer,
   moveSceneItem,
   removeSceneItem,
@@ -20,6 +21,7 @@ import {
   resizeSceneItem,
   resetSceneItemColors,
   setSceneCanvas,
+  setSceneCanvasSize,
   setSceneItemSize,
   setSceneItemColor,
   setSceneItemRole,
@@ -56,6 +58,7 @@ describe('scene domain', () => {
       width: 1000,
       height: 1000,
       canvasId: 'canvas1',
+      canvasSize: 'L',
       schemeId: 'purple',
       items: [],
     });
@@ -984,5 +987,185 @@ describe('session palettes in scenes', () => {
       /color scheme/,
     );
     expect(original.schemeId).toBe('purple');
+  });
+});
+
+describe('canvas detail selection', () => {
+  it('changes only background detail and preserves mixed object details through background and palette changes', () => {
+    const original = freezeScene(
+      setSceneItemSize(populatedScene(), 'item-1', 'S'),
+    );
+    const small = setSceneCanvasSize(original, 'S');
+    expect(small).toEqual({ ...original, canvasSize: 'S' });
+    expect(small.items).toBe(original.items);
+    expect(original.canvasSize).toBe('L');
+
+    const changed = setSceneScheme(setSceneCanvas(small, 'canvas3'), 'teal');
+    expect(changed.canvasSize).toBe('S');
+    expect(changed.items).toBe(original.items);
+    expect(changed.items.map((item) => item.size)).toEqual(['S', 'L']);
+
+    const large = setSceneCanvasSize(changed, 'L');
+    expect(large).toEqual({ ...changed, canvasSize: 'L' });
+    expect(large.items).toBe(original.items);
+  });
+
+  it.each(['M', '', undefined, null])(
+    'rejects invalid or missing canvas detail %j without changing the scene',
+    (value) => {
+      const original = freezeScene(populatedScene());
+      const canvasSize = value as AssetSize;
+      expect(() => setSceneCanvasSize(original, canvasSize)).toThrow(
+        /Unknown canvas size/,
+      );
+      expect(() => assertScene({ ...original, canvasSize })).toThrow(
+        /Unknown canvas size/,
+      );
+      expect(original.canvasSize).toBe('L');
+      expect(original.items).toHaveLength(2);
+    },
+  );
+});
+
+describe('scene item duplication', () => {
+  function sceneWithSettings(): Scene {
+    return {
+      ...createScene(),
+      canvasId: 'canvas3',
+      canvasSize: 'S',
+      schemeId: 'teal',
+      items: [
+        createSceneItem('book', 'before'),
+        {
+          ...createSceneItem('wallet', 'source'),
+          x: -17,
+          y: 726,
+          scale: 0.83,
+          rotation: 37,
+          size: 'S',
+          role: 'bg',
+          colorOverrides: {
+            main: { bg1: 'obj1', obj1: 'bg2' },
+            bg: { bg1: 'bg3', bg2: 'bg1' },
+          },
+        },
+        createSceneItem('phone', 'after'),
+      ],
+    };
+  }
+
+  it('copies every setting and both color maps directly above the source without sharing mutable data', () => {
+    const original = sceneWithSettings();
+    const source = original.items[1];
+    Object.freeze(source.colorOverrides!.main);
+    Object.freeze(source.colorOverrides!.bg);
+    Object.freeze(source.colorOverrides);
+    freezeScene(original);
+    const duplicated = duplicateSceneItem(original, 'source', 'copy');
+    const copy = duplicated.items[2];
+    expect(duplicated).toEqual({
+      ...original,
+      items: [
+        original.items[0],
+        source,
+        { ...source, id: 'copy', x: -1, y: 742 },
+        original.items[2],
+      ],
+    });
+    expect(duplicated.items[0]).toBe(original.items[0]);
+    expect(duplicated.items[1]).toBe(source);
+    expect(duplicated.items[3]).toBe(original.items[2]);
+    expect(copy).not.toBe(source);
+    expect(copy.colorOverrides).not.toBe(source.colorOverrides);
+    expect(copy.colorOverrides!.main).not.toBe(source.colorOverrides!.main);
+    expect(copy.colorOverrides!.bg).not.toBe(source.colorOverrides!.bg);
+
+    const recolored = setSceneItemColor(duplicated, 'copy', 'bg1', 'bg2');
+    const main = setSceneItemRole(recolored, 'copy', 'main');
+    const edited = setSceneItemColor(main, 'copy', 'bg1', 'obj2');
+    expect(edited.items[2].colorOverrides).toEqual({
+      main: { bg1: 'obj2', obj1: 'bg2' },
+      bg: { bg1: 'bg2', bg2: 'bg1' },
+    });
+    expect(source.colorOverrides).toEqual({
+      main: { bg1: 'obj1', obj1: 'bg2' },
+      bg: { bg1: 'bg3', bg2: 'bg1' },
+    });
+    expect(original).toEqual(sceneWithSettings());
+  });
+
+  it.each([
+    { width: 1600, height: 800, x: 500, y: 300, copyX: 512.8, copyY: 312.8 },
+    { width: 1000, height: 1000, x: 995, y: 997, copyX: 979, copyY: 981 },
+    { width: 1000, height: 1000, x: -250, y: 1400, copyX: -234, copyY: 1416 },
+  ])(
+    'offsets a copy near ($x, $y) proportionally without changing its geometry or clamping outside objects',
+    ({ width, height, x, y, copyX, copyY }) => {
+      const original = sceneWithSettings();
+      original.width = width;
+      original.height = height;
+      original.items[1] = { ...original.items[1], x, y };
+      freezeScene(original);
+      const duplicated = duplicateSceneItem(original, 'source', 'copy');
+      expect(duplicated.items[2]).toEqual({
+        ...original.items[1],
+        id: 'copy',
+        x: copyX,
+        y: copyY,
+      });
+      expect(original.items[1]).toMatchObject({ x, y });
+      expect(duplicated.items.map((item) => item.id)).toEqual([
+        'before',
+        'source',
+        'copy',
+        'after',
+      ]);
+    },
+  );
+
+  it('keeps extreme finite coordinates finite and leaves outside copies near their sources', () => {
+    const original = sceneWithSettings();
+    original.width = Number.MAX_VALUE / 2;
+    original.height = Number.MAX_VALUE / 2;
+    original.items[1] = {
+      ...original.items[1],
+      x: Number.MAX_VALUE,
+      y: -Number.MAX_VALUE,
+    };
+    freezeScene(original);
+    const source = original.items[1];
+    const copy = duplicateSceneItem(original, 'source', 'copy').items[2];
+    expect(Number.isFinite(copy.x)).toBe(true);
+    expect(Number.isFinite(copy.y)).toBe(true);
+    expect(copy.x).toBeGreaterThan(original.width);
+    expect(copy.x).toBeLessThan(source.x);
+    expect(copy.y).toBeLessThan(0);
+    expect(copy.y).toBeGreaterThan(source.y);
+    expect({ ...copy, id: source.id, x: source.x, y: source.y }).toEqual(
+      source,
+    );
+    expect(original.items[1]).toBe(source);
+  });
+
+  it.each(['', 'source', 'before', 'unsafe id', undefined, null])(
+    'rejects invalid or occupied new ID %j without changing the scene',
+    (newId) => {
+      const original = freezeScene(sceneWithSettings());
+      expect(() =>
+        duplicateSceneItem(original, 'source', newId as string),
+      ).toThrow(/identifier|Duplicate/);
+      expect(original).toEqual(sceneWithSettings());
+    },
+  );
+
+  it('rejects missing sources and invalid source scenes before creating a copy', () => {
+    const original = freezeScene(sceneWithSettings());
+    expect(() => duplicateSceneItem(original, 'missing', 'copy')).toThrow(
+      /Unknown scene item/,
+    );
+    expect(() =>
+      duplicateSceneItem({ ...original, width: 0 }, 'source', 'copy'),
+    ).toThrow(/dimensions/);
+    expect(original).toEqual(sceneWithSettings());
   });
 });

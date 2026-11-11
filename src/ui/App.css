@@ -123,6 +123,13 @@ a:focus-visible {
   background: #5b40b7;
 }
 
+.button--duplicate {
+  width: 100%;
+  margin-top: 14px;
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+
 .button--delete {
   width: 100%;
   margin-top: 14px;
@@ -356,7 +363,7 @@ p {
   display: flex;
   align-items: center;
   gap: 3px;
-  width: min(188px, calc(100% - 8px));
+  width: min(266px, calc(100% - 8px));
   height: 34px;
   padding: 3px;
   border: 1px solid #d4c7ef;
@@ -381,6 +388,15 @@ p {
 
 .object-layer-toolbar button:hover:not(:disabled) {
   background: #e9e1fa;
+}
+
+.object-layer-toolbar .object-layer-toolbar__delete {
+  background: #fff0f3;
+  color: #a23a53;
+}
+
+.object-layer-toolbar .object-layer-toolbar__delete:hover {
+  background: #fce0e7;
 }
 
 .object-layer-toolbar button:disabled {
@@ -508,6 +524,10 @@ p {
 
 .settings-section {
   margin-top: 25px;
+}
+
+.canvas-detail {
+  margin-top: 14px;
 }
 
 .settings-section h3,

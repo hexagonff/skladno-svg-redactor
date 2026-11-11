@@ -13,6 +13,8 @@ import {
   type AssetSize,
   type CanvasId,
   type ColorScheme,
+  type LibraryAsset,
+  type LibraryManifest,
   type SchemeId,
 } from '../domain/library';
 import {
@@ -984,5 +986,303 @@ describe('SceneStore session palettes', () => {
     store.deleteSelectedItem();
     expect(store.scene.items.map((item) => item.id)).toEqual([second]);
     expect(library.manifest.assets[0].sourceScheme).toBe(schemeId);
+  });
+});
+
+describe('SceneStore canvas detail selection', () => {
+  function library(): LibraryManifest {
+    const assets: LibraryAsset[] = CANVAS_IDS.flatMap((id) =>
+      (['L', 'S'] as const).map((size) => ({
+        id,
+        size,
+        kind: 'canvas' as const,
+        sourceScheme: 'purple' as const,
+        width: size === 'L' ? 1000 : 200,
+        height: size === 'L' ? 1000 : 200,
+        viewBox: size === 'L' ? '0 0 1000 1000' : '0 0 200 200',
+        svg: '<svg/>',
+      })),
+    );
+    assets.push(
+      ...(['L', 'S'] as const).map((size) => ({
+        id: 'book' as const,
+        size,
+        kind: 'object' as const,
+        sourceScheme: 'purple' as const,
+        width: size === 'L' ? 400 : 200,
+        height: size === 'L' ? 300 : 150,
+        viewBox: size === 'L' ? '0 0 400 300' : '0 0 200 150',
+        svg: '<svg/>',
+      })),
+    );
+    return { version: 1, assets };
+  }
+
+  it('keeps canvas detail independent of objects, selection, background, and palette', () => {
+    const store = new SceneStore(undefined, library);
+    store.addItem('book');
+    const first = store.selectedItemId!;
+    store.setSelectedSize('S');
+    store.addItem('book');
+    store.selectItem(first);
+    const before = toJS(store.scene);
+    const selected = store.selectedItem;
+    const { setCanvasSize } = store;
+    setCanvasSize('S');
+    expect(store.scene).toEqual({ ...before, canvasSize: 'S' });
+    expect(store.selectedItem).toBe(selected);
+
+    store.setCanvas('canvas2');
+    store.setScheme('orange');
+    expect(store.scene.canvasSize).toBe('S');
+    expect(store.scene.items).toEqual(before.items);
+    expect(store.selectedItemId).toBe(first);
+    store.setSelectedSize('L');
+    expect(store.scene.canvasSize).toBe('S');
+    const objects = toJS(store.scene.items);
+    setCanvasSize('L');
+    expect(store.scene.items).toEqual(objects);
+    expect(store.scene.canvasId).toBe('canvas2');
+    expect(store.scene.schemeId).toBe('orange');
+  });
+
+  it('preserves background detail when applying a new AI composition', () => {
+    const store = new SceneStore(
+      { ...createScene(), canvasSize: 'S', canvasId: 'canvas2' },
+      library,
+    );
+    store.applyComposition({
+      items: [{ assetId: 'book', role: 'main' }],
+      message: 'Book composition',
+    });
+    expect(store.scene.canvasSize).toBe('S');
+    expect(store.scene.canvasId).toBe('canvas2');
+    expect(store.scene.items).toHaveLength(1);
+  });
+
+  it.each(['M', '', undefined, null])(
+    'rejects invalid canvas detail %j without replacing the scene or selection',
+    (value) => {
+      const store = new SceneStore();
+      store.addItem('book');
+      const before = store.scene;
+      const selected = store.selectedItem;
+      expect(() => store.setCanvasSize(value as AssetSize)).toThrow(
+        /Unknown canvas size/,
+      );
+      expect(
+        () =>
+          new SceneStore({ ...createScene(), canvasSize: value as AssetSize }),
+      ).toThrow(/Unknown canvas size/);
+      expect(store.scene).toBe(before);
+      expect(store.selectedItem).toBe(selected);
+    },
+  );
+
+  it.each(['missing', 'wrong kind', 'ambiguous'] as const)(
+    'rejects a %s canvas variant before changing the scene or selection',
+    (mode) => {
+      const manifest = library();
+      const small = manifest.assets.find(
+        (asset) => asset.id === 'canvas1' && asset.size === 'S',
+      )!;
+      if (mode === 'missing') {
+        manifest.assets = manifest.assets.filter((asset) => asset !== small);
+      } else if (mode === 'wrong kind') {
+        small.kind = 'object';
+      } else {
+        manifest.assets.push({ ...small });
+      }
+      const store = new SceneStore(undefined, () => manifest);
+      store.addItem('book');
+      const before = store.scene;
+      const selected = store.selectedItem;
+      expect(() => store.setCanvasSize('S')).toThrow(/canvas asset/);
+      expect(store.scene).toBe(before);
+      expect(store.scene.canvasSize).toBe('L');
+      expect(store.selectedItem).toBe(selected);
+    },
+  );
+});
+
+describe('SceneStore selected item duplication', () => {
+  function library(): LibraryManifest {
+    return {
+      version: 1,
+      assets: (['L', 'S'] as const).map((size) => ({
+        id: 'book',
+        size,
+        kind: 'object',
+        sourceScheme: 'purple',
+        width: 400,
+        height: 300,
+        viewBox: '0 0 400 300',
+        svg: '<svg/>',
+      })),
+    };
+  }
+
+  it('does nothing without a selected object', () => {
+    const store = new SceneStore();
+    const initial = store.scene;
+    store.duplicateSelectedItem();
+    expect(store.scene).toBe(initial);
+    store.addItem('book');
+    store.selectItem(null);
+    const populated = store.scene;
+    store.duplicateSelectedItem();
+    expect(store.scene).toBe(populated);
+    expect(store.selectedItemId).toBeNull();
+  });
+
+  it('selects a complete copy directly above the source and edits the copy independently', () => {
+    const source = {
+      ...createSceneItem('wallet', 'item-1'),
+      x: -17,
+      y: 726,
+      scale: 0.83,
+      rotation: 37,
+      size: 'S' as const,
+      role: 'bg' as const,
+      colorOverrides: {
+        main: { bg1: 'obj1' as const, obj1: 'bg2' as const },
+        bg: { bg1: 'bg3' as const, bg2: 'bg1' as const },
+      },
+    };
+    const store = new SceneStore({
+      ...createScene(),
+      canvasId: 'canvas3',
+      canvasSize: 'S',
+      schemeId: 'teal',
+      items: [
+        createSceneItem('book', 'before'),
+        source,
+        createSceneItem('phone', 'after'),
+      ],
+    });
+    store.selectItem('item-1');
+    const original = store.selectedItem!;
+    const settings = toJS(original);
+    const { duplicateSelectedItem } = store;
+    duplicateSelectedItem();
+    expect(store.scene.items.map((item) => item.id)).toEqual([
+      'before',
+      'item-1',
+      'item-2',
+      'after',
+    ]);
+    expect(store.selectedItem).toEqual({
+      ...settings,
+      id: 'item-2',
+      x: -1,
+      y: 742,
+    });
+    expect(store.selectedLayer).toBe(3);
+    expect(store.selectedItem!.colorOverrides).not.toBe(
+      original.colorOverrides,
+    );
+    expect(store.selectedItem!.colorOverrides!.main).not.toBe(
+      original.colorOverrides!.main,
+    );
+    expect(store.selectedItem!.colorOverrides!.bg).not.toBe(
+      original.colorOverrides!.bg,
+    );
+    expect(store.scene).toMatchObject({
+      canvasId: 'canvas3',
+      canvasSize: 'S',
+      schemeId: 'teal',
+    });
+
+    store.setSelectedColor('bg1', 'bg2');
+    store.setSelectedRole('main');
+    store.setSelectedColor('bg1', 'obj2');
+    store.setSelectedSize('L');
+    store.moveItem(store.selectedItemId!, { x: 25, y: 60 });
+    store.setSelectedScale(1.7);
+    store.rotateSelected('clockwise');
+    expect(original).toEqual(settings);
+    expect(store.selectedItem).toMatchObject({
+      size: 'L',
+      role: 'main',
+      x: 25,
+      y: 60,
+      scale: 1.7,
+      rotation: 52,
+      colorOverrides: {
+        main: { bg1: 'obj2', obj1: 'bg2' },
+        bg: { bg1: 'bg2', bg2: 'bg1' },
+      },
+    });
+  });
+
+  it('never reuses deleted or AI-replaced IDs for duplicated objects', () => {
+    const store = new SceneStore(undefined, library);
+    store.addItem('book');
+    store.duplicateSelectedItem();
+    expect(store.selectedItemId).toBe('item-2');
+    store.deleteSelectedItem();
+    store.selectItem('item-1');
+    store.duplicateSelectedItem();
+    expect(store.selectedItemId).toBe('item-3');
+    store.applyComposition({
+      items: [{ assetId: 'book', role: 'main' }],
+      message: 'Book composition',
+    });
+    expect(store.scene.items[0].id).toBe('item-4');
+    store.selectItem('item-4');
+    store.duplicateSelectedItem();
+    expect(store.selectedItemId).toBe('item-5');
+    store.deleteSelectedItem();
+    store.selectItem('item-4');
+    store.duplicateSelectedItem();
+    expect(store.selectedItemId).toBe('item-6');
+  });
+
+  it('validates a copied variant before committing state or consuming its ID', () => {
+    const manifest = library();
+    const store = new SceneStore(undefined, () => manifest);
+    store.addItem('book');
+    store.setSelectedSize('S');
+    const small = manifest.assets.find((asset) => asset.size === 'S')!;
+    manifest.assets = manifest.assets.filter((asset) => asset !== small);
+    const before = store.scene;
+    const selected = store.selectedItem;
+    expect(() => store.duplicateSelectedItem()).toThrow(/object asset/);
+    expect(store.scene).toBe(before);
+    expect(store.selectedItem).toBe(selected);
+    manifest.assets.push(small);
+    store.duplicateSelectedItem();
+    expect(store.selectedItemId).toBe('item-2');
+    expect(store.selectedItem!.size).toBe('S');
+  });
+
+  it('copies an imported object instance without resetting its scale or registering another asset', () => {
+    const library = new LibraryStore({ version: 1, assets: [] });
+    const assetId = library.importObject(
+      'Custom shape',
+      inspectImportedSvg(
+        '<svg viewBox="0 0 40 20"><path fill="red" d="M0 0h40v20H0z"/></svg>',
+      ),
+      { '#FF0000': 'obj1', '#000000': 'black' },
+      'purple',
+    );
+    const store = new SceneStore(undefined, () => library.manifest);
+    store.addItem(assetId);
+    store.setSelectedScale(1.7);
+    store.moveItem(store.selectedItemId!, { x: 21, y: -40 });
+    store.rotateSelected('counterclockwise');
+    const source = toJS(store.selectedItem!);
+    store.duplicateSelectedItem();
+    expect(store.selectedItem).toEqual({
+      ...source,
+      id: 'item-2',
+      x: 37,
+      y: -24,
+    });
+    expect(library.manifest.assets).toHaveLength(1);
+    expect(store.scene.items.map((item) => item.assetId)).toEqual([
+      assetId,
+      assetId,
+    ]);
   });
 });

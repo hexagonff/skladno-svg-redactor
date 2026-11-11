@@ -141,12 +141,17 @@ export function composeScene(
   if (!Number.isSafeInteger(seed) || seed < 0) {
     throw new Error('Номер варианта должен быть целым неотрицательным числом.');
   }
-  const validated = validateCompositionPlan(
-    plan,
-    manifest.assets.filter(
-      (asset) => asset.kind === 'object' && asset.size === 'L',
-    ),
-  );
+  const catalog = manifest.assets
+    .filter((asset) => asset.kind === 'object' && asset.size === 'L')
+    .map((asset) => ({
+      id: asset.id,
+      availableSizes: manifest.assets
+        .filter(
+          (variant) => variant.kind === 'object' && variant.id === asset.id,
+        )
+        .map((variant) => variant.size),
+    }));
+  const validated = validateCompositionPlan(plan, catalog);
   if (validated.items.length === 0) {
     throw new Error(
       validated.message || 'Не найдены подходящие объекты для композиции.',
@@ -154,12 +159,13 @@ export function composeScene(
   }
   const usedIds = new Set(scene.items.map((item) => item.id));
   let nextId = 1;
-  const items: SizedItem[] = validated.items.map(({ assetId, role }) => {
+  const items: SizedItem[] = validated.items.map(({ assetId, role, size }) => {
     while (usedIds.has(`composition-${nextId}`)) nextId += 1;
     const id = `composition-${nextId++}`;
     usedIds.add(id);
     const item = {
       ...createSceneItem(assetId, id),
+      size: size ?? 'L',
       role,
       scale: getDefaultObjectScale(assetId, manifest),
     };

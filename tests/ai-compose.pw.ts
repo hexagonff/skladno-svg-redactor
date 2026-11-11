@@ -1,11 +1,13 @@
+import { readFile } from 'node:fs/promises';
+import { DOMParser } from '@xmldom/xmldom';
 import { expect, test, type Page, type Route } from '@playwright/test';
 
 const COMPOSE_URL = '**/api/compose';
 const STUDY_PLAN = {
   items: [
-    { assetId: 'book', role: 'main' },
-    { assetId: 'lamp', role: 'bg' },
-    { assetId: 'phone', role: 'main' },
+    { assetId: 'book', role: 'main', size: 'S' },
+    { assetId: 'lamp', role: 'bg', size: 'S' },
+    { assetId: 'phone', role: 'main', size: 'L' },
   ],
   message: 'Собрана композиция для учёбы: книга, лампа и телефон.',
 };
@@ -46,17 +48,18 @@ async function canvasSvg(page: Page) {
     .evaluate((element) => element.outerHTML);
 }
 
-test('description selects existing objects, keeps fixed sizes, background and palette, and sends no SVG or API key', async ({
+test('description honors selected L/S and roles, preserves background and palette, and sends catalog metadata only', async ({
   page,
 }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
   let received: Record<string, unknown> | undefined;
+  let reply: unknown = STUDY_PLAN;
   await page.route(COMPOSE_URL, async (route) => {
     received = route.request().postDataJSON() as Record<string, unknown>;
     expect(route.request().method()).toBe('POST');
     expect(route.request().headers()).not.toHaveProperty('authorization');
-    await fulfill(route, STUDY_PLAN);
+    await fulfill(route, reply);
   });
   await page.goto('/');
   await page.getByLabel('Файл SVG', { exact: true }).setInputFiles({
@@ -95,11 +98,13 @@ test('description selects existing objects, keeps fixed sizes, background and pa
         id: 'book',
         name: 'Книга',
         description: expect.any(String),
+        availableSizes: ['L', 'S'],
       }),
       expect.objectContaining({
         id: 'custom-1',
         name: 'Будильник',
         description: expect.any(String),
+        availableSizes: ['L'],
       }),
     ]),
   );
@@ -118,13 +123,22 @@ test('description selects existing objects, keeps fixed sizes, background and pa
       elements.map((element) => element.getAttribute('data-item-id')),
     ),
   ).not.toContain(originalId);
-  for (const item of await items.all()) {
-    await expect(item).toHaveAttribute('data-detail-size', 'L');
+  for (const { assetId, size } of STUDY_PLAN.items) {
+    const item = canvas(page).locator(
+      '[data-item-id][data-asset-id="' + assetId + '"]',
+    );
+    await expect(item).toHaveAttribute('data-detail-size', size);
     await expect(item).toHaveAttribute(
       'transform',
-      /rotate\(0\) scale\(0\.35\)/,
+      size === 'S' ? /rotate\(0\) scale\(0\.7\)/ : /rotate\(0\) scale\(0\.35\)/,
     );
   }
+  await expect(
+    canvas(page).locator('[data-asset-id="book"] svg'),
+  ).toHaveAttribute('viewBox', '0 0 723 489');
+  await expect(
+    canvas(page).locator('[data-asset-id="lamp"] svg'),
+  ).toHaveAttribute('viewBox', '0 0 473 565');
   const translations = await items.evaluateAll((elements) =>
     elements.map(
       (element) =>
@@ -162,6 +176,38 @@ test('description selects existing objects, keeps fixed sizes, background and pa
   expect(await canvasSvg(page)).not.toMatch(
     /<image|foreignObject|<style|var\s*\(/,
   );
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Скачать SVG', exact: true }).click();
+  const filename = await (await download).path();
+  if (!filename) throw new Error('Expected an SVG download.');
+  const exported = await readFile(filename, 'utf8');
+  const document = new DOMParser().parseFromString(exported, 'image/svg+xml');
+  const exportedItems = Array.from(document.getElementsByTagName('g')).filter(
+    (group) => group.hasAttribute('data-item-id'),
+  );
+  expect(
+    exportedItems.map((group) => [
+      group.getAttribute('data-asset-id'),
+      group.getAttribute('data-detail-size'),
+    ]),
+  ).toEqual([
+    ['lamp', 'S'],
+    ['book', 'S'],
+    ['phone', 'L'],
+  ]);
+  expect(exported).not.toMatch(/<image|foreignObject|<style|var\s*\(/);
+
+  // An uploaded L-only object cannot silently fall back when AI asks for S.
+  const beforeInvalidDetail = await canvasSvg(page);
+  reply = {
+    items: [{ assetId: 'custom-1', role: 'bg', size: 'S' }],
+    message: 'Unavailable imported detail',
+  };
+  await promptInput(page).fill('Будильник');
+  await submitButton(page).click();
+  await expect(composer(page).getByRole('alert')).toBeVisible();
+  expect(await canvasSvg(page)).toBe(beforeInvalidDetail);
+  await expect(promptInput(page)).toHaveValue('Будильник');
   expect(pageErrors).toEqual([]);
 });
 
@@ -242,7 +288,7 @@ test('cancellation prevents late responses from overwriting the next composition
   await promptInput(page).fill('Первый запрос');
   await submitButton(page).click();
   await expect(composer(page).getByRole('status')).toHaveText(
-    'Подбираем объекты и собираем композицию…',
+    'Подбираем объекты, роли и детализацию…',
   );
   await expect.poll(() => requests).toBe(1);
   await expect(promptInput(page)).toBeDisabled();
@@ -306,7 +352,9 @@ test('empty or invalid AI choices leave existing objects unchanged', async ({
   await submitButton(page).click();
   await expect(composer(page).getByRole('alert')).toBeVisible();
   expect(await canvasSvg(page)).toBe(before);
-  await expect(composer(page).getByRole('status')).toBeEmpty();
+  await expect(
+    composer(page).getByRole('status', { includeHidden: true }),
+  ).toBeEmpty();
 });
 
 test('composer supports keyboard submission and fits a narrow viewport', async ({

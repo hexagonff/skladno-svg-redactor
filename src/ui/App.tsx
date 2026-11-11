@@ -232,6 +232,18 @@ const Editor = observer(function Editor({
     store.setSelectedScale(scale);
   }
 
+  function duplicateSelectedObject() {
+    finishGesture();
+    store.duplicateSelectedItem();
+    setHoveredItemId(null);
+  }
+
+  function deleteSelectedObject() {
+    finishGesture();
+    store.deleteSelectedItem();
+    setHoveredItemId(null);
+  }
+
   useEffect(
     () => () => {
       const gesture = gestureRef.current;
@@ -281,6 +293,7 @@ const Editor = observer(function Editor({
         >
           <AiComposer
             catalog={catalog}
+            manifest={libraryManifest}
             onApply={(plan) => {
               finishGesture();
               store.applyComposition(plan);
@@ -360,6 +373,8 @@ const Editor = observer(function Editor({
                     sceneHeight={scene.height}
                     onScaleChange={changeSelectedScale}
                     onRotate={changeSelectedRotation}
+                    onDuplicate={duplicateSelectedObject}
+                    onDelete={deleteSelectedObject}
                     layer={store.selectedLayer!}
                     canRaise={store.canRaiseSelected}
                     canLower={store.canLowerSelected}
@@ -417,6 +432,38 @@ const Editor = observer(function Editor({
                 </option>
               ))}
             </select>
+            <div className="canvas-detail">
+              <span id="canvas-detail-label" className="field-label">
+                Детализация фона
+              </span>
+              <div
+                className="segmented-control"
+                role="group"
+                aria-labelledby="canvas-detail-label"
+              >
+                {(['L', 'S'] as const).map((size) => (
+                  <button
+                    key={size}
+                    type="button"
+                    aria-pressed={scene.canvasSize === size}
+                    disabled={
+                      !libraryManifest.assets.some(
+                        (asset) =>
+                          asset.kind === 'canvas' &&
+                          asset.id === scene.canvasId &&
+                          asset.size === size,
+                      )
+                    }
+                    onClick={() => {
+                      finishGesture();
+                      store.setCanvasSize(size);
+                    }}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+            </div>
           </section>
 
           <section className="settings-section" aria-labelledby="scheme-title">
@@ -577,12 +624,25 @@ const Editor = observer(function Editor({
               </p>
             )}
             <button
+              className="button button--duplicate"
+              type="button"
+              disabled={!selectedItem}
+              onClick={duplicateSelectedObject}
+            >
+              <svg
+                viewBox="0 0 20 20"
+                aria-hidden="true"
+                className="button__icon"
+              >
+                <rect x="7" y="7" width="9" height="9" rx="1.5" />
+                <path d="M12 7V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h3" />
+              </svg>
+              Дублировать объект
+            </button>
+            <button
               className="button button--delete"
               disabled={!selectedItem}
-              onClick={() => {
-                finishGesture();
-                store.deleteSelectedItem();
-              }}
+              onClick={deleteSelectedObject}
             >
               Удалить выбранный
             </button>

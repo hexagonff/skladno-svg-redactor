@@ -217,7 +217,7 @@ export function renderScene(
     root.appendChild(group);
   };
 
-  const canvas = assetFor(manifest, scene.canvasId, 'L', 'canvas');
+  const canvas = assetFor(manifest, scene.canvasId, scene.canvasSize, 'canvas');
   const canvasBox = viewBoxFor(canvas);
   const canvasScale = Math.max(
     scene.width / canvasBox[2],
@@ -229,7 +229,7 @@ export function renderScene(
     `translate(${scene.width / 2} ${scene.height / 2}) scale(${canvasScale}) translate(${-canvasBox[0] - canvasBox[2] / 2} ${-canvasBox[1] - canvasBox[3] / 2})`,
     `${prefix}_canvas`,
     'main',
-    { 'data-canvas-id': canvas.id, 'data-detail-size': 'L' },
+    { 'data-canvas-id': canvas.id, 'data-detail-size': scene.canvasSize },
   );
 
   const instanceIds = new Set<string>();

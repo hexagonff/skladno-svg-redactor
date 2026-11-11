@@ -23,6 +23,7 @@ export async function requestComposition(
     if (signal?.aborted) throw error;
     throw new Error(
       'Не удалось связаться с сервером. Проверьте соединение и попробуйте ещё раз.',
+      { cause: error },
     );
   }
   let body: unknown;

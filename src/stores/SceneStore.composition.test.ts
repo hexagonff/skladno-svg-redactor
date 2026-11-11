@@ -22,23 +22,46 @@ function library(): LibraryManifest {
     viewBox: `0 0 ${width} ${height}`,
     svg: '<svg/>',
   }));
+  assets.push(
+    {
+      ...assets[0],
+      size: 'S',
+      width: 723,
+      height: 430,
+      viewBox: '37 -11 723 430',
+      svg: '<svg viewBox="37 -11 723 430"><path d="M37 -11L760 419Z"/></svg>',
+    },
+    {
+      ...assets[1],
+      size: 'S',
+      width: 473,
+      height: 500,
+      viewBox: '-9 21 473 500',
+      svg: '<svg viewBox="-9 21 473 500"><path d="M-9 21L464 521Z"/></svg>',
+    },
+  );
   return { version: 1, assets };
 }
 function plan(): CompositionPlan {
   return {
     message: 'Учёба',
     items: [
-      { assetId: 'book', role: 'main' },
-      { assetId: 'phone', role: 'main' },
-      { assetId: 'lamp', role: 'bg' },
+      { assetId: 'book', role: 'main', size: 'S' },
+      { assetId: 'phone', role: 'main', size: 'L' },
+      { assetId: 'lamp', role: 'bg', size: 'S' },
     ],
   };
 }
 
 describe('SceneStore automatic composition', () => {
-  it('applies a complete composition with one observable update and clears selection on success', () => {
+  it('applies mixed L/S and roles with one observable update and clears selection on success', () => {
     const store = new SceneStore(
-      { ...createScene(), canvasId: 'canvas2', schemeId: 'teal' },
+      {
+        ...createScene(),
+        canvasId: 'canvas2',
+        canvasSize: 'S',
+        schemeId: 'teal',
+      },
       library,
     );
     store.addItem('book');
@@ -55,6 +78,7 @@ describe('SceneStore automatic composition', () => {
     expect(states).toEqual([`1/${oldId}`, '3/none']);
     expect(store.scene).toMatchObject({
       canvasId: 'canvas2',
+      canvasSize: 'S',
       schemeId: 'teal',
       width: 1000,
       height: 1000,
@@ -64,6 +88,19 @@ describe('SceneStore automatic composition', () => {
       'book',
       'phone',
     ]);
+    expect(
+      store.scene.items.map(({ size, role, scale }) => ({ size, role, scale })),
+    ).toEqual([
+      { size: 'S', role: 'bg', scale: 0.35 },
+      { size: 'S', role: 'main', scale: 0.35 },
+      { size: 'L', role: 'main', scale: 0.35 },
+    ]);
+    const book = store.scene.items.find(({ assetId }) => assetId === 'book')!;
+    const geometry = getObjectGeometry(book, library());
+    expect(geometry.viewBox).toEqual([37, -11, 723, 430]);
+    expect(geometry.asset.svg).toContain('M37 -11L760 419Z');
+    expect(geometry.width).toBeCloseTo(506.1);
+    expect(geometry.height).toBeCloseTo(301);
     expect(store.scene.items.map((item) => item.id)).not.toContain(oldId);
     expect(store.selectedItem).toBeUndefined();
     store.selectItem(store.scene.items[0].id);
@@ -103,6 +140,10 @@ describe('SceneStore automatic composition', () => {
       { ...plan(), items: [] },
       {
         ...plan(),
+        items: [{ assetId: 'custom-icon', role: 'main', size: 'S' }],
+      } as CompositionPlan,
+      {
+        ...plan(),
         items: [{ assetId: 'custom-missing', role: 'main' }],
       } as CompositionPlan,
     ]) {
@@ -116,6 +157,28 @@ describe('SceneStore automatic composition', () => {
     store.addItem('book');
     expect(store.selectedItemId).toBe('item-2');
   });
+
+  it.each(['bg', 'main'] as const)(
+    'allows all items to have role %s without adding or dropping objects',
+    (role) => {
+      const store = new SceneStore(undefined, library);
+      store.addItem('phone');
+      store.applyComposition({
+        ...plan(),
+        items: plan().items.map((item) => ({ ...item, role })),
+      });
+      expect(store.scene.items).toHaveLength(3);
+      expect(store.scene.items.every((item) => item.role === role)).toBe(true);
+      expect(
+        store.scene.items.map(({ assetId, size }) => ({ assetId, size })),
+      ).toEqual([
+        { assetId: 'book', size: 'S' },
+        { assetId: 'phone', size: 'L' },
+        { assetId: 'lamp', size: 'S' },
+      ]);
+      expect(store.selectedItem).toBeUndefined();
+    },
+  );
 
   it('requires a library callback and uses exactly the manual initial scale for imported SVG', () => {
     const unregistered = new SceneStore();

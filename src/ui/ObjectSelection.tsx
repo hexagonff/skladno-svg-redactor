@@ -22,6 +22,8 @@ interface ObjectSelectionProps {
   canLower: boolean;
   onLayerChange: (direction: 'up' | 'down') => void;
   onRotate: (direction: RotationDirection) => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
 }
 
 export function ObjectSelection({
@@ -36,6 +38,8 @@ export function ObjectSelection({
   canLower,
   onLayerChange,
   onRotate,
+  onDuplicate,
+  onDelete,
 }: ObjectSelectionProps) {
   function changeWithKeyboard(event: KeyboardEvent<HTMLButtonElement>) {
     if (
@@ -83,7 +87,7 @@ export function ObjectSelection({
         role="group"
         aria-label="Быстрые действия объекта"
         style={{
-          left: `clamp(min(98px, 50%), ${(item.x / sceneWidth) * 100}%, max(50%, calc(100% - 98px)))`,
+          left: `clamp(min(137px, 50%), ${(item.x / sceneWidth) * 100}%, max(50%, calc(100% - 137px)))`,
           top: `clamp(4px, calc(${((item.y - verticalExtent / 2) / sceneHeight) * 100}% - 42px), calc(100% - 36px))`,
         }}
         onPointerDown={(event) => event.stopPropagation()}
@@ -118,6 +122,29 @@ export function ObjectSelection({
         </button>
         <span className="object-layer-toolbar__separator" aria-hidden="true" />
         <RotationButtons onRotate={onRotate} />
+        <span className="object-layer-toolbar__separator" aria-hidden="true" />
+        <button
+          type="button"
+          aria-label="Дублировать объект"
+          title="Дублировать объект"
+          onClick={onDuplicate}
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <rect x="7" y="7" width="9" height="9" rx="1.5" />
+            <path d="M12 7V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h3" />
+          </svg>
+        </button>
+        <button
+          className="object-layer-toolbar__delete"
+          type="button"
+          aria-label="Удалить объект"
+          title="Удалить объект"
+          onClick={onDelete}
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M3.5 5.5h13M8 3.5h4M5.5 5.5l.7 11h7.6l.7-11M8 8.5v5M12 8.5v5" />
+          </svg>
+        </button>
       </div>
     </>
   );

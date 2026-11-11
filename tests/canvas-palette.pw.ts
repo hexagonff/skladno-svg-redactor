@@ -15,7 +15,7 @@ async function geometryOf(element: Locator): Promise<string> {
   );
 }
 
-test('background and palette are independent and retain object edits in the editor and SVG export', async ({
+test('background pattern, detail and palette are independent and retain object edits in the editor and SVG export', async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -23,7 +23,17 @@ test('background and palette are independent and retain object edits in the edit
   await page.goto('/');
   const background = page.getByRole('combobox', { name: 'Фон', exact: true });
   const palette = page.getByRole('combobox', { name: 'Палитра', exact: true });
+  const backgroundDetail = page.getByRole('group', {
+    name: 'Детализация фона',
+    exact: true,
+  });
   await expect(background).toHaveValue('canvas1');
+  await expect(
+    backgroundDetail.getByRole('button', { name: 'L', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(
+    backgroundDetail.getByRole('button', { name: 'S', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'false');
   await expect(palette).toHaveValue('purple');
   await expect(background.getByRole('option')).toHaveText([
     'Фон 1',
@@ -92,23 +102,54 @@ test('background and palette are independent and retain object edits in the edit
     expect(await geometryOf(item)).toBe(objectGeometry);
   };
 
-  // A pattern change retains the palette and the entire object SVG.
+  // Every supplied L/S artwork can change independently of the edited object.
   for (const canvasId of ['canvas1', 'canvas2', 'canvas3']) {
     await background.selectOption(canvasId);
-    await expect(artwork).toHaveAttribute('data-canvas-id', canvasId);
-    await expect(palette).toHaveValue('purple');
-    await expect(artwork.locator('rect').first()).toHaveAttribute(
-      'fill',
-      '#D7CDF5',
-    );
-    expect(await item.evaluate((element) => element.outerHTML)).toBe(
-      objectBefore,
-    );
-    await expectEdits();
+    let largePath: string | null = null;
+    for (const size of ['L', 'S']) {
+      await backgroundDetail
+        .getByRole('button', { name: size, exact: true })
+        .click();
+      await expect(
+        backgroundDetail.getByRole('button', { name: size, exact: true }),
+      ).toHaveAttribute('aria-pressed', 'true');
+      await expect(
+        backgroundDetail.getByRole('button', {
+          name: size === 'L' ? 'S' : 'L',
+          exact: true,
+        }),
+      ).toHaveAttribute('aria-pressed', 'false');
+      await expect(background).toHaveValue(canvasId);
+      await expect(artwork).toHaveAttribute('data-canvas-id', canvasId);
+      await expect(artwork).toHaveAttribute('data-detail-size', size);
+      const sourceDimension = size === 'L' ? '1000' : '500';
+      await expect(artwork.locator('svg')).toHaveAttribute(
+        'viewBox',
+        `0 0 ${sourceDimension} ${sourceDimension}`,
+      );
+      await expect(artwork.locator('rect').first()).toHaveAttribute(
+        'width',
+        sourceDimension,
+      );
+      const path = await artwork.locator('path').first().getAttribute('d');
+      expect(path).toBeTruthy();
+      if (size === 'L') largePath = path;
+      else expect(path).not.toBe(largePath);
+      await expect(palette).toHaveValue('purple');
+      await expect(artwork.locator('rect').first()).toHaveAttribute(
+        'fill',
+        '#D7CDF5',
+      );
+      expect(await item.evaluate((element) => element.outerHTML)).toBe(
+        objectBefore,
+      );
+      await expectEdits();
+    }
   }
 
   // A palette change recolors the chosen pattern without replacing its geometry.
   await background.selectOption('canvas2');
+  await expect(artwork).toHaveAttribute('data-detail-size', 'S');
   const canvasGeometry = await geometryOf(artwork);
   for (const [schemeId, bg1, bg2, bg3] of [
     ['purple', '#D7CDF5', '#AA9BF0', '#7864D7'],
@@ -118,6 +159,10 @@ test('background and palette are independent and retain object edits in the edit
     await palette.selectOption(schemeId);
     await expect(background).toHaveValue('canvas2');
     await expect(artwork).toHaveAttribute('data-canvas-id', 'canvas2');
+    await expect(artwork).toHaveAttribute('data-detail-size', 'S');
+    await expect(
+      backgroundDetail.getByRole('button', { name: 'S', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true');
     await expect(artwork.locator('rect').first()).toHaveAttribute('fill', bg1);
     await expect(artwork.locator('path')).toHaveAttribute('fill', bg2);
     await expect(artwork.locator('line').first()).toHaveAttribute(
@@ -152,6 +197,13 @@ test('background and palette are independent and retain object edits in the edit
     document.getElementsByTagName('g'),
   ).find((group) => group.hasAttribute('data-canvas-id'));
   expect(exportedBackground!.getAttribute('data-canvas-id')).toBe('canvas2');
+  expect(exportedBackground!.getAttribute('data-detail-size')).toBe('S');
+  expect(
+    exportedBackground!.getElementsByTagName('svg')[0]!.getAttribute('viewBox'),
+  ).toBe('0 0 500 500');
+  expect(
+    exportedBackground!.getElementsByTagName('rect')[0]!.getAttribute('width'),
+  ).toBe('500');
   expect(
     exportedBackground!.getElementsByTagName('rect')[0]!.getAttribute('fill'),
   ).toBe('#BEEBEB');

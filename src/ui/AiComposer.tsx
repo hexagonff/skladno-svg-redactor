@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import type { CatalogObject } from '../domain/catalog';
+import type { LibraryManifest } from '../domain/library';
 import {
   createCompositionCatalog,
   type CompositionPlan,
@@ -9,10 +10,11 @@ import './AiComposer.css';
 
 export interface AiComposerProps {
   catalog: readonly CatalogObject[];
+  manifest: LibraryManifest;
   onApply: (plan: CompositionPlan) => void;
 }
 
-export function AiComposer({ catalog, onApply }: AiComposerProps) {
+export function AiComposer({ catalog, manifest, onApply }: AiComposerProps) {
   const id = useId();
   const attemptRef = useRef(0);
   const controllerRef = useRef<AbortController | null>(null);
@@ -39,10 +41,13 @@ export function AiComposer({ catalog, onApply }: AiComposerProps) {
     controllerRef.current = controller;
     setPending(true);
     setError('');
-    setMessage('Подбираем объекты и собираем композицию…');
+    setMessage('Подбираем объекты, роли и детализацию…');
     try {
       const plan = await requestComposition(
-        { prompt: description, catalog: createCompositionCatalog(catalog) },
+        {
+          prompt: description,
+          catalog: createCompositionCatalog(catalog, manifest),
+        },
         controller.signal,
       );
       if (attempt !== attemptRef.current) return;

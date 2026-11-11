@@ -20,6 +20,7 @@ import {
   cloneSceneItem,
   createScene,
   createSceneItem,
+  duplicateSceneItem,
   getSceneItemLayer,
   moveSceneItem,
   removeSceneItem,
@@ -28,6 +29,7 @@ import {
   resizeSceneItem,
   resetSceneItemColors,
   setSceneCanvas,
+  setSceneCanvasSize,
   setSceneItemSize,
   setSceneItemColor,
   setSceneItemRole,
@@ -139,6 +141,26 @@ export class SceneStore {
     this.selectedItemId = item.id;
   }
 
+  duplicateSelectedItem(): void {
+    if (this.selectedItemId === null) return;
+    let nextNumber = this.nextItemNumber;
+    while (this.issuedItemIds.has(`item-${nextNumber}`)) {
+      nextNumber += 1;
+    }
+    const id = `item-${nextNumber}`;
+    const scene = duplicateSceneItem(this.scene, this.selectedItemId, id);
+    const copy = scene.items.find((item) => item.id === id)!;
+    if (this.getManifest) {
+      getObjectGeometry(copy, this.getManifest());
+    } else if (isImportedAssetId(copy.assetId)) {
+      throw new Error('Imported objects require a registered library.');
+    }
+    this.scene = scene;
+    this.issuedItemIds.add(id);
+    this.nextItemNumber = nextNumber + 1;
+    this.selectedItemId = id;
+  }
+
   applyComposition(plan: CompositionPlan, seed = 0): void {
     if (!this.getManifest) {
       throw new Error('Для автоматической сборки требуется каталог объектов.');
@@ -207,6 +229,21 @@ export class SceneStore {
 
   setCanvas(id: CanvasId): void {
     this.scene = setSceneCanvas(this.scene, id);
+  }
+
+  setCanvasSize(size: AssetSize): void {
+    const scene = setSceneCanvasSize(this.scene, size);
+    if (this.getManifest) {
+      const matches = this.getManifest().assets.filter(
+        (asset) => asset.id === scene.canvasId && asset.size === size,
+      );
+      if (matches.length !== 1 || matches[0].kind !== 'canvas') {
+        throw new Error(
+          `Missing, duplicate or invalid canvas asset: ${scene.canvasId}__${size}.`,
+        );
+      }
+    }
+    this.scene = scene;
   }
 
   setScheme(id: SchemeId): void {

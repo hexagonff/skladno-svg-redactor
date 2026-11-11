@@ -85,6 +85,7 @@ const scene: Scene = {
   height: 1000,
   schemeId: 'purple',
   canvasId: 'canvas1',
+  canvasSize: 'L',
   items: [
     {
       id: 'first',
@@ -295,13 +296,20 @@ describe('renderAssetSvg', () => {
 describe('renderScene', () => {
   it.each(
     (['canvas1', 'canvas2', 'canvas3'] as const).flatMap((canvasId) =>
-      schemes.map((scheme) => ({ canvasId, scheme, schemeId: scheme.id })),
+      schemes.flatMap((scheme) =>
+        (['L', 'S'] as const).map((canvasSize) => ({
+          canvasId,
+          canvasSize,
+          scheme,
+          schemeId: scheme.id,
+        })),
+      ),
     ),
   )(
-    'renders the selected $canvasId in the independent $schemeId scheme with literal colors',
-    ({ canvasId, scheme }) => {
+    'renders the selected $canvasId/$canvasSize in the independent $schemeId scheme with literal colors',
+    ({ canvasId, canvasSize, scheme }) => {
       const svg = renderScene(
-        { ...scene, canvasId, schemeId: scheme.id },
+        { ...scene, canvasId, canvasSize, schemeId: scheme.id },
         manifest,
         schemes,
         'export',
@@ -315,7 +323,16 @@ describe('renderScene', () => {
         group.hasAttribute('data-canvas-id'),
       )!;
       expect(canvas.getAttribute('data-canvas-id')).toBe(canvasId);
-      expect(canvas.getAttribute('data-detail-size')).toBe('L');
+      expect(canvas.getAttribute('data-detail-size')).toBe(canvasSize);
+      const nested = canvas.getElementsByTagName('svg')[0];
+      expect(nested.getAttribute('viewBox')).toBe(
+        canvasSize === 'S' ? '0 0 500 500' : '0 0 1000 1000',
+      );
+      expect(canvas.getAttribute('transform')).toBe(
+        canvasSize === 'S'
+          ? 'translate(500 500) scale(2) translate(-250 -250)'
+          : 'translate(500 500) scale(1) translate(-500 -500)',
+      );
       const canvasSvg = serializeSvg(canvas.getElementsByTagName('svg')[0]);
       const paints = visiblePaints(canvasSvg);
       expect(paints).toEqual(
@@ -338,7 +355,7 @@ describe('renderScene', () => {
       expect(
         elements(canvasSvg, 'path').map((path) => path.getAttribute('d')),
       ).toEqual(
-        elements(assetFor(canvasId).svg, 'path').map((path) =>
+        elements(assetFor(canvasId, canvasSize).svg, 'path').map((path) =>
           path.getAttribute('d'),
         ),
       );
@@ -374,9 +391,9 @@ describe('renderScene', () => {
       ],
     };
     const before = renderScene(customized, manifest, schemes, 'canvas-switch');
-    for (const canvasId of ['canvas2', 'canvas3'] as const) {
+    for (const canvasId of ['canvas1', 'canvas2', 'canvas3'] as const) {
       const after = renderScene(
-        { ...customized, canvasId },
+        { ...customized, canvasId, canvasSize: 'S' },
         manifest,
         schemes,
         'canvas-switch',
@@ -390,6 +407,7 @@ describe('renderScene', () => {
       expect(itemPaints(after, 'second')).toContain(teal.colors.bg2);
     }
     expect(customized.canvasId).toBe('canvas1');
+    expect(customized.canvasSize).toBe('L');
     expect(customized.schemeId).toBe('teal');
   });
 
@@ -643,56 +661,99 @@ describe('renderScene', () => {
     ).toThrow(/object asset: phone__L/);
   });
 
-  it('centers nonzero viewBoxes using only uniform scaling, including rectangular canvases', () => {
-    const small = {
-      ...clippedAsset,
-      size: 'S' as const,
-      width: 200,
-      height: 90,
-      viewBox: '10 -20 200 90',
-      svg: clippedAsset.svg.replace(
-        'viewBox="-30 20 400 180"',
-        'viewBox="10 -20 200 90"',
-      ),
-    };
-    const canvas: LibraryAsset = {
-      ...assetFor('canvas1', 'L'),
-      width: 800,
-      height: 400,
-      viewBox: '10 20 800 400',
-      svg: '<svg width="800" height="400" viewBox="10 20 800 400"><rect x="10" y="20" width="800" height="400" fill="var(--bg1)"/></svg>',
-    };
-    const svg = renderScene(
-      {
-        ...scene,
-        width: 1000,
-        height: 500,
-        items: [{ ...scene.items[0], assetId: 'book', size: 'S' }],
-      },
-      { version: 1, assets: [clippedAsset, small, canvas] },
-      schemes,
-      'rectangular',
-    );
-    expect(itemGroup(svg).getAttribute('transform')).toBe(
-      'translate(400 600) rotate(15) scale(1) translate(-110 -25)',
-    );
-    const nested = itemGroup(svg).getElementsByTagName('svg')[0];
-    expect(
-      ['x', 'y', 'width', 'height', 'viewBox'].map((name) =>
-        nested.getAttribute(name),
-      ),
-    ).toEqual(['10', '-20', '200', '90', '10 -20 200 90']);
-    const canvasGroup = elements(svg, 'g').find((group) =>
-      group.hasAttribute('data-canvas-id'),
-    )!;
-    expect(canvasGroup.getAttribute('transform')).toBe(
-      'translate(500 250) scale(1.25) translate(-410 -220)',
-    );
-    for (const group of [itemGroup(svg), canvasGroup]) {
-      expect(group.getAttribute('transform')).toMatch(/scale\([-\d.e+]+\)/);
-      expect(group.getAttribute('transform')).not.toMatch(/scale\([^)]*[, ]/);
-    }
-  });
+  it.each(['canvas1', 'canvas2', 'canvas3'] as const)(
+    'renders the independent S underlay for %s without requiring or reading its L artwork',
+    (canvasId) => {
+      const svg = renderScene(
+        { ...scene, canvasId, canvasSize: 'S' },
+        {
+          ...manifest,
+          assets: manifest.assets.filter(
+            (asset) => asset.id !== canvasId || asset.size === 'S',
+          ),
+        },
+        schemes,
+        'small-underlay',
+      );
+      const canvas = elements(svg, 'g').find(
+        (group) => group.getAttribute('data-canvas-id') === canvasId,
+      )!;
+      const paths = Array.from(canvas.getElementsByTagName('path'), (path) =>
+        path.getAttribute('d'),
+      );
+      expect(paths).toEqual(
+        elements(assetFor(canvasId, 'S').svg, 'path').map((path) =>
+          path.getAttribute('d'),
+        ),
+      );
+      expect(paths).not.toEqual(
+        elements(assetFor(canvasId, 'L').svg, 'path').map((path) =>
+          path.getAttribute('d'),
+        ),
+      );
+      expect(svg).not.toMatch(/var\s*\(|<(?:image|foreignObject|style)\b/);
+      expect(serializeSvg(itemGroup(svg))).toBe(
+        serializeSvg(
+          itemGroup(renderScene(scene, manifest, schemes, 'small-underlay')),
+        ),
+      );
+    },
+  );
+
+  it.each(['L', 'S'] as const)(
+    'centers nonzero viewBoxes using only uniform scaling for a rectangular %s underlay',
+    (canvasSize) => {
+      const small = {
+        ...clippedAsset,
+        size: 'S' as const,
+        width: 200,
+        height: 90,
+        viewBox: '10 -20 200 90',
+        svg: clippedAsset.svg.replace(
+          'viewBox="-30 20 400 180"',
+          'viewBox="10 -20 200 90"',
+        ),
+      };
+      const canvas: LibraryAsset = {
+        ...assetFor('canvas1', canvasSize),
+        width: 800,
+        height: 400,
+        viewBox: '10 20 800 400',
+        svg: '<svg width="800" height="400" viewBox="10 20 800 400"><rect x="10" y="20" width="800" height="400" fill="var(--bg1)"/></svg>',
+      };
+      const svg = renderScene(
+        {
+          ...scene,
+          width: 1000,
+          height: 500,
+          canvasSize,
+          items: [{ ...scene.items[0], assetId: 'book', size: 'S' }],
+        },
+        { version: 1, assets: [clippedAsset, small, canvas] },
+        schemes,
+        'rectangular',
+      );
+      expect(itemGroup(svg).getAttribute('transform')).toBe(
+        'translate(400 600) rotate(15) scale(1) translate(-110 -25)',
+      );
+      const nested = itemGroup(svg).getElementsByTagName('svg')[0];
+      expect(
+        ['x', 'y', 'width', 'height', 'viewBox'].map((name) =>
+          nested.getAttribute(name),
+        ),
+      ).toEqual(['10', '-20', '200', '90', '10 -20 200 90']);
+      const canvasGroup = elements(svg, 'g').find((group) =>
+        group.hasAttribute('data-canvas-id'),
+      )!;
+      expect(canvasGroup.getAttribute('transform')).toBe(
+        'translate(500 250) scale(1.25) translate(-410 -220)',
+      );
+      for (const group of [itemGroup(svg), canvasGroup]) {
+        expect(group.getAttribute('transform')).toMatch(/scale\([-\d.e+]+\)/);
+        expect(group.getAttribute('transform')).not.toMatch(/scale\([^)]*[, ]/);
+      }
+    },
+  );
 
   it('gives repeated clipped instances unique definitions, internal refs and separate preview/scene scopes', () => {
     const fixture = {
@@ -874,6 +935,19 @@ describe('renderScene', () => {
         renderScene(scene, { version: 1, assets }, schemes, 'x'),
       ).toThrow(/canvas asset: canvas1__L/);
     }
+    expect(() =>
+      renderScene(
+        { ...scene, canvasSize: 'S' },
+        {
+          ...manifest,
+          assets: manifest.assets.filter(
+            (asset) => asset.id !== 'canvas1' || asset.size !== 'S',
+          ),
+        },
+        schemes,
+        'missing-small-underlay',
+      ),
+    ).toThrow(/canvas asset: canvas1__S/);
     expect(() =>
       renderScene(
         { ...scene, schemeId: 'missing' as Scene['schemeId'] },

@@ -33,6 +33,18 @@ function library(): LibraryManifest {
       asset('folder', 1241, 659),
       asset('pen', 509, 286),
       asset('custom-icon', 24, 12),
+      {
+        ...asset('book', 723, 430),
+        size: 'S',
+        viewBox: '37 -11 723 430',
+        svg: '<svg viewBox="37 -11 723 430"><path d="M37 -11L760 419Z"/></svg>',
+      },
+      {
+        ...asset('lamp', 473, 500),
+        size: 'S',
+        viewBox: '-9 21 473 500',
+        svg: '<svg viewBox="-9 21 473 500"><path d="M-9 21L464 521Z"/></svg>',
+      },
     ],
   };
 }
@@ -140,6 +152,100 @@ describe('fixed-size composition layout', () => {
       );
     },
   );
+
+  it('honors mixed L/S geometry and original contours at the canonical uniform scale', () => {
+    const manifest = library();
+    const requested: CompositionPlan = {
+      message: 'Mixed detail',
+      items: [
+        { assetId: 'book', role: 'main', size: 'S' },
+        { assetId: 'phone', role: 'main', size: 'L' },
+        { assetId: 'lamp', role: 'bg', size: 'S' },
+      ],
+    };
+    const before = structuredClone({ manifest, requested });
+    const result = composeScene(createScene(), manifest, requested);
+    expect({ manifest, requested }).toEqual(before);
+    expect(
+      result.items.map(({ assetId, role, size, scale }) => ({
+        assetId,
+        role,
+        size,
+        scale,
+      })),
+    ).toEqual([
+      { assetId: 'lamp', role: 'bg', size: 'S', scale: 0.35 },
+      { assetId: 'book', role: 'main', size: 'S', scale: 0.35 },
+      { assetId: 'phone', role: 'main', size: 'L', scale: 0.35 },
+    ]);
+    const book = result.items.find(({ assetId }) => assetId === 'book')!;
+    const geometry = getObjectGeometry(book, manifest);
+    const suppliedSmall = manifest.assets.find(
+      ({ id, size }) => id === 'book' && size === 'S',
+    )!;
+    const suppliedLarge = manifest.assets.find(
+      ({ id, size }) => id === 'book' && size === 'L',
+    )!;
+    expect(geometry.asset).toBe(suppliedSmall);
+    expect(geometry.viewBox).toEqual([37, -11, 723, 430]);
+    expect(geometry.asset.svg).toBe(suppliedSmall.svg);
+    expect(geometry.asset.svg).not.toBe(suppliedLarge.svg);
+    expect(geometry.width).toBeCloseTo(506.1);
+    expect(geometry.height).toBeCloseTo(301);
+    expect(geometry.scale).toBeCloseTo(0.7);
+    expect(geometry.width / 723).toBeCloseTo(geometry.height / 430);
+    expectReadable(result, manifest);
+  });
+
+  it.each([
+    {
+      name: 'more than two background objects',
+      roles: ['bg', 'bg', 'bg', 'main'] as const,
+    },
+    {
+      name: 'only background objects',
+      roles: ['bg', 'bg', 'bg', 'bg'] as const,
+    },
+    {
+      name: 'no background objects',
+      roles: ['main', 'main', 'main', 'main'] as const,
+    },
+  ])(
+    'accepts $name and keeps background objects below the main ones',
+    ({ roles }) => {
+      const ids = ['book', 'phone', 'lamp', 'vase'] as const;
+      const requested: CompositionPlan = {
+        message: 'Roles are selected independently',
+        items: roles.map((role, index) => ({
+          assetId: ids[index],
+          role,
+          size: index === 0 || index === 2 ? 'S' : 'L',
+        })),
+      };
+      const result = composeScene(createScene(), library(), requested);
+      expect(result.items.map(({ role }) => role)).toEqual([
+        ...roles.filter((role) => role === 'bg'),
+        ...roles.filter((role) => role === 'main'),
+      ]);
+      expect(new Set(result.items.map(({ assetId }) => assetId)).size).toBe(4);
+      expectReadable(result, library());
+    },
+  );
+
+  it('rejects unavailable S without replacing an existing scene or inventing geometry', () => {
+    const source = {
+      ...createScene(),
+      items: [createSceneItem('phone', 'keep')],
+    };
+    const before = structuredClone(source);
+    expect(() =>
+      composeScene(source, library(), {
+        message: 'Unavailable detail',
+        items: [{ assetId: 'custom-icon', role: 'bg', size: 'S' }],
+      }),
+    ).toThrow();
+    expect(source).toEqual(before);
+  });
 
   it('is deterministic and offers another arrangement without changing the selected objects', () => {
     const first = composeScene(createScene(), library(), plan(), 0);
