@@ -169,3 +169,38 @@ describe('composition API detail selection', () => {
     expect(await response.json()).toEqual({ error: expect.any(String) });
   });
 });
+
+describe('native source size metadata', () => {
+  it('forwards the selected canvas while replacing forged builtin dimensions with real source sizes', async () => {
+    const fetchMock = provider(mixedPlan);
+    const response = await handleCompose(
+      request({
+        ...input,
+        canvas: { width: 500, height: 500 },
+        catalog: input.catalog.map((entry) => ({
+          ...entry,
+          sourceSizes: {
+            L: { width: 1, height: 1 },
+            S: { width: 2, height: 2 },
+          },
+        })),
+      }),
+      env,
+      { fetch: fetchMock },
+    );
+    expect(response.status).toBe(200);
+    const forwarded = messages(fetchMock).user as typeof input & {
+      canvas: { width: number; height: number };
+    };
+    expect(forwarded.canvas).toEqual({ width: 500, height: 500 });
+    expect(
+      forwarded.catalog.find((entry) => entry.id === 'book')!.sourceSizes,
+    ).toEqual({
+      L: { width: 1446, height: 977 },
+      S: { width: 723, height: 489 },
+    });
+    expect(
+      forwarded.catalog.find((entry) => entry.id === 'custom-1')!.sourceSizes,
+    ).toEqual({ L: { width: 1, height: 1 } });
+  });
+});

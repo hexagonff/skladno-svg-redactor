@@ -73,7 +73,7 @@ describe('session SVG library', () => {
     expect(library.catalog).toBe(OBJECT_CATALOG);
   });
 
-  it('adds only registered objects and keeps the source ratio at a usable initial size', () => {
+  it('adds only registered objects and keeps the original source dimensions', () => {
     const { library } = makeLibrary();
     const store = new SceneStore(undefined, () => library.manifest);
     expect(() => store.addItem('custom-missing')).toThrow();
@@ -91,7 +91,7 @@ describe('session SVG library', () => {
       x: 500,
       y: 500,
     });
-    expect(store.selectedItem?.scale).toBeCloseTo(250 / 24);
+    expect(store.selectedItem?.scale).toBeCloseTo(1);
     const before = store.scene;
     expect(() => store.setSelectedSize('S')).toThrow();
     expect(store.scene).toBe(before);
@@ -115,7 +115,7 @@ describe('session SVG library', () => {
     expect(library.manifest.assets).toHaveLength(1);
   });
 
-  it('requires a library for custom initial scenes and normalizes very tall objects uniformly', () => {
+  it('requires a library for custom initial scenes and preserves the native size of very tall objects', () => {
     expect(() => new SceneStore().addItem('custom-1')).toThrow(
       /registered library/,
     );
@@ -130,7 +130,7 @@ describe('session SVG library', () => {
     );
     const store = new SceneStore(undefined, () => library.manifest);
     store.addItem(id);
-    expect(store.selectedItem?.scale).toBeCloseTo(0.25);
+    expect(store.selectedItem?.scale).toBeCloseTo(1);
     expect(() => new SceneStore(store.scene)).toThrow(/registered library/);
   });
 });

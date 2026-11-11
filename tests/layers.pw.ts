@@ -144,7 +144,7 @@ test('layer drag, arrows and numeric order change actual SVG overlap while retai
   const ids = await addWallets(page, 3);
   const [bottom, middle, top] = ids as [string, string, string];
   await page
-    .getByRole('group', { name: 'Детализация объекта', exact: true })
+    .getByRole('group', { name: 'Размер исходника объекта', exact: true })
     .getByRole('button', { name: 'S', exact: true })
     .click();
   await page
@@ -245,7 +245,7 @@ test('layer drag, arrows and numeric order change actual SVG overlap while retai
   await expect(layer).toHaveValue('2');
   await expect(
     page
-      .getByRole('group', { name: 'Детализация объекта', exact: true })
+      .getByRole('group', { name: 'Размер исходника объекта', exact: true })
       .getByRole('button', { name: 'S', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true');
   await expect(

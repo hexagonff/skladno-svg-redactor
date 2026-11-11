@@ -76,7 +76,7 @@ test('drag preserves the grab offset and export; deleting removes only the selec
   ).toHaveAttribute('aria-pressed', 'true');
 
   await page
-    .getByRole('group', { name: 'Детализация объекта', exact: true })
+    .getByRole('group', { name: 'Размер исходника объекта', exact: true })
     .getByRole('button', { name: 'S', exact: true })
     .click();
   await page
@@ -84,11 +84,8 @@ test('drag preserves the grab offset and export; deleting removes only the selec
     .selectOption('orange');
   expect(await positionOf(item)).toEqual(moved);
   const smallBounds = await svgViewportBounds(item.locator('svg').first());
-  expect(smallBounds.width / largeBounds.width).toBeCloseTo(1, 4);
-  expect(smallBounds.height / largeBounds.height).toBeCloseTo(
-    (489 * 2) / 977,
-    4,
-  );
+  expect(smallBounds.width / largeBounds.width).toBeCloseTo(0.5, 4);
+  expect(smallBounds.height / largeBounds.height).toBeCloseTo(489 / 977, 4);
   const exported = new DOMParser().parseFromString(
     await downloadedSvg(page),
     'image/svg+xml',
@@ -205,7 +202,7 @@ test.describe('touch dragging', () => {
       .getByRole('button', { name: 'Добавить: Книга', exact: true })
       .click();
     await page
-      .getByRole('group', { name: 'Детализация объекта', exact: true })
+      .getByRole('group', { name: 'Размер исходника объекта', exact: true })
       .getByRole('button', { name: 'S', exact: true })
       .click();
     const canvas = page.getByLabel('Холст композиции', { exact: true });

@@ -294,6 +294,7 @@ const Editor = observer(function Editor({
           <AiComposer
             catalog={catalog}
             manifest={libraryManifest}
+            canvas={{ width: scene.width, height: scene.height }}
             onApply={(plan) => {
               finishGesture();
               store.applyComposition(plan);
@@ -345,7 +346,9 @@ const Editor = observer(function Editor({
         <section className="workspace__canvas" aria-labelledby="canvas-title">
           <div className="canvas-toolbar">
             <h2 id="canvas-title">Холст</h2>
-            <span className="canvas-toolbar__meta">1000 × 1000</span>
+            <span className="canvas-toolbar__meta">
+              {scene.width} × {scene.height}
+            </span>
           </div>
           <div className="canvas-stage">
             <div
@@ -434,7 +437,7 @@ const Editor = observer(function Editor({
             </select>
             <div className="canvas-detail">
               <span id="canvas-detail-label" className="field-label">
-                Детализация фона
+                Размер фона
               </span>
               <div
                 className="segmented-control"
@@ -463,6 +466,10 @@ const Editor = observer(function Editor({
                   </button>
                 ))}
               </div>
+              <p className="field-hint">
+                {scene.width} × {scene.height}. Детализация соответствует
+                выбранному фону.
+              </p>
             </div>
           </section>
 
@@ -533,11 +540,11 @@ const Editor = observer(function Editor({
                   }}
                 />
                 <div className="object-size">
-                  <h4 className="object-size__title">Детализация</h4>
+                  <h4 className="object-size__title">Размер исходника</h4>
                   <div
                     className="segmented-control"
                     role="group"
-                    aria-label="Детализация объекта"
+                    aria-label="Размер исходника объекта"
                   >
                     {(['L', 'S'] as const).map((size) => (
                       <button
@@ -560,6 +567,10 @@ const Editor = observer(function Editor({
                       </button>
                     ))}
                   </div>
+                  <p className="field-hint">
+                    {selectedAsset?.width} × {selectedAsset?.height}. Выбор L/S
+                    восстанавливает размер исходника вместе с его детализацией.
+                  </p>
                   {!libraryManifest.assets.some(
                     (asset) =>
                       asset.id === selectedItem.assetId && asset.size === 'S',

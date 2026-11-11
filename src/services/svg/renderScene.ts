@@ -150,13 +150,13 @@ function assetFor(
   return matches[0];
 }
 
-/** Preserve root styles/definitions; make the nested viewport identity in asset units. */
-function viewportFor(svg: string, box: ViewBox): Element {
+/** Preserve the source viewport, viewBox and aspect ratio in each instance. */
+function viewportFor(svg: string, box: ViewBox, asset: LibraryAsset): Element {
   const root = parseSvg(svg).documentElement!;
   root.setAttribute('x', String(box[0]));
   root.setAttribute('y', String(box[1]));
-  root.setAttribute('width', String(box[2]));
-  root.setAttribute('height', String(box[3]));
+  root.setAttribute('width', String(asset.width));
+  root.setAttribute('height', String(asset.height));
   root.setAttribute('viewBox', box.join(' '));
   return root;
 }
@@ -213,20 +213,20 @@ export function renderScene(
       role,
       overrides,
     );
-    group.appendChild(document.importNode(viewportFor(svg, box), true));
+    group.appendChild(document.importNode(viewportFor(svg, box, asset), true));
     root.appendChild(group);
   };
 
   const canvas = assetFor(manifest, scene.canvasId, scene.canvasSize, 'canvas');
   const canvasBox = viewBoxFor(canvas);
   const canvasScale = Math.max(
-    scene.width / canvasBox[2],
-    scene.height / canvasBox[3],
+    scene.width / canvas.width,
+    scene.height / canvas.height,
   );
   appendAsset(
     canvas,
     canvasBox,
-    `translate(${scene.width / 2} ${scene.height / 2}) scale(${canvasScale}) translate(${-canvasBox[0] - canvasBox[2] / 2} ${-canvasBox[1] - canvasBox[3] / 2})`,
+    `translate(${scene.width / 2} ${scene.height / 2}) scale(${canvasScale}) translate(${-canvasBox[0] - canvas.width / 2} ${-canvasBox[1] - canvas.height / 2})`,
     `${prefix}_canvas`,
     'main',
     { 'data-canvas-id': canvas.id, 'data-detail-size': scene.canvasSize },
@@ -248,7 +248,7 @@ export function renderScene(
     appendAsset(
       asset,
       box,
-      `translate(${item.x} ${item.y}) rotate(${item.rotation}) scale(${scale}) translate(${-box[0] - box[2] / 2} ${-box[1] - box[3] / 2})`,
+      `translate(${item.x} ${item.y}) rotate(${item.rotation}) scale(${scale}) translate(${-box[0] - asset.width / 2} ${-box[1] - asset.height / 2})`,
       `${prefix}_item_${encodeIdentifier(item.id)}`,
       item.role,
       {

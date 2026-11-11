@@ -44,8 +44,8 @@ describe('inspectImportedSvg', () => {
     const result = inspectImportedSvg(
       '<svg width="400" height="200" viewBox="-40 25 200 100"><rect x="-40" y="25" width="200" height="100" fill="white"/></svg>',
     );
-    expect(result.width).toBe(200);
-    expect(result.height).toBe(100);
+    expect(result.width).toBe(400);
+    expect(result.height).toBe(200);
     expect(result.viewBox).toBe('-40 25 200 100');
     expect(root(result.svg).getAttribute('xmlns')).toBe(
       'http://www.w3.org/2000/svg',

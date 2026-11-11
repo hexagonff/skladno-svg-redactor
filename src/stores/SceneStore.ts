@@ -232,18 +232,19 @@ export class SceneStore {
   }
 
   setCanvasSize(size: AssetSize): void {
-    const scene = setSceneCanvasSize(this.scene, size);
+    let dimensions: { width: number; height: number } | undefined;
     if (this.getManifest) {
       const matches = this.getManifest().assets.filter(
-        (asset) => asset.id === scene.canvasId && asset.size === size,
+        (asset) => asset.id === this.scene.canvasId && asset.size === size,
       );
       if (matches.length !== 1 || matches[0].kind !== 'canvas') {
         throw new Error(
-          `Missing, duplicate or invalid canvas asset: ${scene.canvasId}__${size}.`,
+          `Missing, duplicate or invalid canvas asset: ${this.scene.canvasId}__${size}.`,
         );
       }
+      dimensions = { width: matches[0].width, height: matches[0].height };
     }
-    this.scene = scene;
+    this.scene = setSceneCanvasSize(this.scene, size, dimensions);
   }
 
   setScheme(id: SchemeId): void {

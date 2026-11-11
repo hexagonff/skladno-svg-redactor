@@ -104,7 +104,7 @@ test('rotation arrows in both locations preserve the selected object settings an
   const selected = items.nth(1);
   const selectedId = await selected.getAttribute('data-item-id');
   await page
-    .getByRole('group', { name: 'Детализация объекта', exact: true })
+    .getByRole('group', { name: 'Размер исходника объекта', exact: true })
     .getByRole('button', { name: 'S', exact: true })
     .click();
   const width = page.getByRole('spinbutton', { name: 'Ширина', exact: true });
@@ -254,7 +254,7 @@ test('rotated selection remains draggable and corner resizing fixes the opposite
   await expectRotation(item, angle, 45);
   await expect(
     page.getByRole('spinbutton', { name: 'Ширина', exact: true }),
-  ).toHaveValue('276.06');
+  ).toHaveValue('788.75');
   expect(errors).toEqual([]);
 });
 

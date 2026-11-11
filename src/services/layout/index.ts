@@ -130,7 +130,106 @@ function chooseLayout(
   return variants[seed % variants.length];
 }
 
-/** Replace a composition only after every catalog object fits at its established size. */
+/** Place sources without resizing; oversized sources may extend beyond the canvas. */
+function placeOverlapping(
+  items: SizedItem[],
+  scene: Scene,
+  margin: number,
+  seed: number,
+): void {
+  const ordered = [...items].sort(
+    (a, b) => b.width * b.height - a.width * a.height,
+  );
+  const anchors = [0, 0.25, 0.5, 0.75, 1];
+  type Placement = { entry: SizedItem; x: number; y: number };
+  const axisPositions = (length: number, extent: number) => {
+    const fits = length <= extent - margin * 2;
+    // Keep smaller sources whole. Let larger ones move to an edge and leave
+    // room for accents, keeping the source centre inside the frame.
+    const visible = Math.min(length, extent) * 0.65;
+    const from = fits ? margin + length / 2 : Math.max(0, visible - length / 2);
+    const to = fits
+      ? extent - margin - length / 2
+      : Math.min(extent, extent - visible + length / 2);
+    return anchors.map((fraction) => from + (to - from) * fraction);
+  };
+  const positions = (entry: SizedItem) =>
+    axisPositions(entry.height, scene.height).flatMap((y) =>
+      axisPositions(entry.width, scene.width).map((x) => ({ entry, x, y })),
+    );
+  const visibleBounds = ({ entry, x, y }: Placement) => ({
+    left: Math.max(0, x - entry.width / 2),
+    right: Math.min(scene.width, x + entry.width / 2),
+    top: Math.max(0, y - entry.height / 2),
+    bottom: Math.min(scene.height, y + entry.height / 2),
+  });
+  const visibleArea = (placement: Placement) => {
+    const box = visibleBounds(placement);
+    return (box.right - box.left) * (box.bottom - box.top);
+  };
+  const cropCost = (placement: Placement) =>
+    (1 -
+      visibleArea(placement) /
+        (Math.min(placement.entry.width, scene.width) *
+          Math.min(placement.entry.height, scene.height))) *
+    1.5;
+  const positionCost = (placement: Placement) =>
+    cropCost(placement) +
+    (((placement.x - scene.width / 2) / scene.width) ** 2 +
+      ((placement.y - scene.height / 2) / scene.height) ** 2) *
+      0.02;
+  const overlapCost = (next: Placement, previous: Placement[]) => {
+    const box = visibleBounds(next);
+    return previous.reduce((cost, other) => {
+      const otherBox = visibleBounds(other);
+      const width = Math.max(
+        0,
+        Math.min(box.right, otherBox.right) - Math.max(box.left, otherBox.left),
+      );
+      const height = Math.max(
+        0,
+        Math.min(box.bottom, otherBox.bottom) - Math.max(box.top, otherBox.top),
+      );
+      const fraction =
+        (width * height) / Math.min(visibleArea(next), visibleArea(other));
+      const weight =
+        next.entry.item.role === 'main' && other.entry.item.role === 'main'
+          ? 3
+          : 1;
+      return cost + weight * (fraction + fraction ** 3 * 8);
+    }, 0);
+  };
+  const solutions = positions(ordered[0]).map((first) => {
+    const placed = [first];
+    let score = positionCost(first);
+    for (const entry of ordered.slice(1)) {
+      const choices = positions(entry).map((position, index, options) => ({
+        position,
+        cost: overlapCost(position, placed) + positionCost(position),
+        tie: (index + seed) % options.length,
+      }));
+      choices.sort((a, b) => a.cost - b.cost || a.tie - b.tie);
+      score += choices[0].cost;
+      placed.push(choices[0].position);
+    }
+    const boxes = placed.map(visibleBounds);
+    const left = Math.min(...boxes.map((box) => box.left));
+    const right = Math.max(...boxes.map((box) => box.right));
+    const top = Math.min(...boxes.map((box) => box.top));
+    const bottom = Math.max(...boxes.map((box) => box.bottom));
+    score +=
+      Math.abs((left + right) / scene.width - 1) * 0.1 +
+      Math.abs((top + bottom) / scene.height - 1) * 0.1;
+    return { placed, score };
+  });
+  solutions.sort((a, b) => a.score - b.score);
+  for (const { entry, x, y } of solutions[0].placed) {
+    entry.item.x = seed % 2 ? scene.width - x : x;
+    entry.item.y = Math.floor(seed / 2) % 2 ? scene.height - y : y;
+  }
+}
+
+/** Preserve the exact source sizes selected by AI, including sources larger than the canvas. */
 export function composeScene(
   scene: Scene,
   manifest: LibraryManifest,
@@ -179,37 +278,38 @@ export function composeScene(
   const innerHeight = scene.height - margin * 2;
   const candidate = chooseLayout(items, innerWidth, innerHeight, gap, seed);
   if (!candidate) {
-    throw new Error(
-      'Не удалось разместить все объекты в исходных размерах. Выберите более просторный формат или меньше объектов.',
-    );
-  }
-
-  const { groups, horizontal, width, height } = candidate;
-  const left = (scene.width - width) / 2;
-  const top = (scene.height - height) / 2;
-  let acrossOffset = 0;
-  for (const group of groups) {
-    const dimensions = groupDimensions(group, items, horizontal, gap);
-    const availableAlong = horizontal ? width : height;
-    let alongOffset = (availableAlong - dimensions.along) / 2;
-    for (const index of group) {
-      const entry = items[index];
-      const along = horizontal ? entry.width : entry.height;
-      entry.item.x =
-        left +
-        (horizontal
-          ? alongOffset + along / 2
-          : acrossOffset + dimensions.across / 2);
-      entry.item.y =
-        top +
-        (horizontal
-          ? acrossOffset + dimensions.across / 2
-          : alongOffset + along / 2);
-      alongOffset += along + gap;
+    placeOverlapping(items, scene, margin, seed);
+  } else {
+    const { groups, horizontal, width, height } = candidate;
+    const left = (scene.width - width) / 2;
+    const top = (scene.height - height) / 2;
+    let acrossOffset = 0;
+    for (const group of groups) {
+      const dimensions = groupDimensions(group, items, horizontal, gap);
+      const availableAlong = horizontal ? width : height;
+      let alongOffset = (availableAlong - dimensions.along) / 2;
+      for (const index of group) {
+        const entry = items[index];
+        const along = horizontal ? entry.width : entry.height;
+        entry.item.x =
+          left +
+          (horizontal
+            ? alongOffset + along / 2
+            : acrossOffset + dimensions.across / 2);
+        entry.item.y =
+          top +
+          (horizontal
+            ? acrossOffset + dimensions.across / 2
+            : alongOffset + along / 2);
+        alongOffset += along + gap;
+      }
+      acrossOffset += dimensions.across + gap;
     }
-    acrossOffset += dimensions.across + gap;
   }
-  const placed = items.map(({ item }) => item);
+  // Keep role-based layers; within each role smaller sources stay above larger ones.
+  const placed = [...items]
+    .sort((a, b) => b.width * b.height - a.width * a.height)
+    .map(({ item }) => item);
   const composed = {
     ...scene,
     items: [

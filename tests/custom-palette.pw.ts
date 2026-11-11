@@ -137,7 +137,7 @@ test('custom palette recolors the canvas, main and background objects, uploads a
   });
   await addWallet.click();
   await page
-    .getByRole('group', { name: 'Детализация объекта', exact: true })
+    .getByRole('group', { name: 'Размер исходника объекта', exact: true })
     .getByRole('button', { name: 'S', exact: true })
     .click();
   await page

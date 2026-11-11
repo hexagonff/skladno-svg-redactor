@@ -30,7 +30,7 @@ export interface SceneItem {
   colorOverrides?: Partial<Record<SceneRole, ObjectColorOverrides>>;
   x: number;
   y: number;
-  // One scale applies to both axes, relative to the L artwork width.
+  // Manual uniform scale relative to the selected source SVG viewport.
   scale: number;
   rotation: number;
 }
@@ -140,7 +140,7 @@ export function createSceneItem(
     size: 'L',
     role: 'main',
     ...position,
-    scale: 0.35,
+    scale: 1,
     rotation: 0,
   };
   assertItem(item);
@@ -256,7 +256,7 @@ export function setSceneItemSize(
   return {
     ...scene,
     items: scene.items.map((item) =>
-      item.id === itemId ? { ...item, size } : item,
+      item.id === itemId ? { ...item, size, scale: 1 } : item,
     ),
   };
 }
@@ -269,12 +269,39 @@ export function setSceneCanvas(scene: Scene, canvasId: CanvasId): Scene {
   return { ...scene, canvasId };
 }
 
-export function setSceneCanvasSize(scene: Scene, size: AssetSize): Scene {
+export function setSceneCanvasSize(
+  scene: Scene,
+  size: AssetSize,
+  dimensions = {
+    width: size === 'L' ? 1000 : 500,
+    height: size === 'L' ? 1000 : 500,
+  },
+): Scene {
   assertScene(scene);
   if (!ASSET_SIZES.includes(size)) {
     throw new Error(`Unknown canvas size: ${size}`);
   }
-  return { ...scene, canvasSize: size };
+  if (
+    ![dimensions.width, dimensions.height].every(
+      (value) => Number.isFinite(value) && value > 0,
+    )
+  ) {
+    throw new Error('Canvas dimensions must be positive finite numbers.');
+  }
+  const ratioX = dimensions.width / scene.width;
+  const ratioY = dimensions.height / scene.height;
+  const next = {
+    ...scene,
+    canvasSize: size,
+    ...dimensions,
+    items: scene.items.map((item) => ({
+      ...item,
+      x: item.x * ratioX,
+      y: item.y * ratioY,
+    })),
+  };
+  assertScene(next);
+  return next;
 }
 
 export function setSceneScheme(scene: Scene, schemeId: SchemeId): Scene {

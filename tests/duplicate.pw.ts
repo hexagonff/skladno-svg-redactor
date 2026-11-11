@@ -105,7 +105,7 @@ test('toolbar duplicate shifts an otherwise identical copy above its source and 
   const originalId = await itemId(items);
   const original = canvas(page).locator('[data-item-id="' + originalId + '"]');
   const detail = page.getByRole('group', {
-    name: 'Детализация объекта',
+    name: 'Размер исходника объекта',
     exact: true,
   });
   const width = page.getByRole('spinbutton', { name: 'Ширина', exact: true });

@@ -46,6 +46,21 @@ const { manifest, warnings } = buildLibrary(sources, schemes, colorMaps);
 // Keep source copies intact. IDs are prefixed per scene instance by prefixSvgIds.
 const output = new URL('manifest.json', libraryDirectory);
 await writeFile(output, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
+const sourceSizes: Record<
+  string,
+  Record<string, { width: number; height: number }>
+> = {};
+for (const asset of manifest.assets) {
+  (sourceSizes[asset.id] ??= {})[asset.size] = {
+    width: asset.width,
+    height: asset.height,
+  };
+}
+await writeFile(
+  new URL('source-sizes.json', assetsDirectory),
+  JSON.stringify(sourceSizes, null, 2) + '\n',
+  'utf8',
+);
 for (const warning of warnings) console.warn(`WARNING: ${warning}`);
 console.log(
   `Built ${manifest.assets.length} independent SVG assets (20 objects, 6 canvases).`,

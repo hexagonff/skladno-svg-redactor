@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import builtinSourceSizes from '../assets/source-sizes.json';
 import { OBJECT_CATALOG, type CatalogObject } from './catalog';
 import {
   ASSET_SIZES,
@@ -11,16 +12,23 @@ import type { ObjectId, SceneRole } from './scene';
 export const COMPOSITION_PROMPT_MAX_LENGTH = 1000;
 export const COMPOSITION_MAX_ITEMS = 6;
 
+export interface SourceDimensions {
+  width: number;
+  height: number;
+}
+
 export interface CompositionCatalogEntry {
   id: ObjectId;
   name: string;
   description: string;
   availableSizes?: AssetSize[];
+  sourceSizes?: Partial<Record<AssetSize, SourceDimensions>>;
 }
 
 export interface CompositionRequest {
   prompt: string;
   catalog: CompositionCatalogEntry[];
+  canvas?: SourceDimensions;
 }
 
 export interface CompositionPlan {
@@ -46,6 +54,10 @@ function defaultAvailableSizes(id: string): AssetSize[] {
   return builtinIds.includes(id) ? [...ASSET_SIZES] : ['L'];
 }
 
+const dimensionsSchema = z.strictObject({
+  width: z.number().positive().max(1e6),
+  height: z.number().positive().max(1e6),
+});
 const sizeSchema = z.enum(ASSET_SIZES);
 const objectIdSchema = z.custom<ObjectId>(
   (value) =>
@@ -56,6 +68,12 @@ const catalogEntrySchema = z.strictObject({
   id: objectIdSchema,
   name: z.string().trim().min(1).max(80),
   description: z.string().trim().min(1).max(500),
+  sourceSizes: z
+    .strictObject({
+      L: dimensionsSchema.optional(),
+      S: dimensionsSchema.optional(),
+    })
+    .optional(),
   availableSizes: z
     .array(sizeSchema)
     .min(1)
@@ -66,6 +84,7 @@ const catalogEntrySchema = z.strictObject({
 const requestSchema = z.strictObject({
   prompt: z.string().trim().min(1).max(COMPOSITION_PROMPT_MAX_LENGTH),
   catalog: z.array(catalogEntrySchema).min(1).max(100),
+  canvas: dimensionsSchema.optional(),
 });
 const planSchema = z.strictObject({
   items: z
@@ -82,24 +101,50 @@ const planSchema = z.strictObject({
 
 /** Built-in descriptions are canonical; uploaded assets are described only by their registered name. */
 export function createCompositionCatalog(
-  catalog: readonly CatalogObject[],
+  catalog: readonly (CatalogObject & {
+    sourceSizes?: Partial<Record<AssetSize, SourceDimensions>>;
+  })[],
   manifest?: LibraryManifest,
 ): CompositionCatalogEntry[] {
-  return catalog.map(({ id, name }) => {
+  return catalog.map(({ id, name, sourceSizes }) => {
     const builtin = OBJECT_CATALOG.find((entry) => entry.id === id);
+    const availableSizes = manifest
+      ? ASSET_SIZES.filter((size) =>
+          manifest.assets.some(
+            (asset) =>
+              asset.kind === 'object' && asset.id === id && asset.size === size,
+          ),
+        )
+      : defaultAvailableSizes(id);
+    const dimensions: Partial<Record<AssetSize, SourceDimensions>> = {};
+    for (const size of availableSizes) {
+      const source = manifest
+        ? manifest.assets.find(
+            (asset) =>
+              asset.kind === 'object' && asset.id === id && asset.size === size,
+          )
+        : builtin
+          ? (
+              builtinSourceSizes as Record<
+                string,
+                Partial<Record<AssetSize, SourceDimensions>>
+              >
+            )[id]?.[size]
+          : sourceSizes?.[size];
+      if (
+        source &&
+        [source.width, source.height].every(
+          (value) => Number.isFinite(value) && value > 0,
+        )
+      ) {
+        dimensions[size] = { width: source.width, height: source.height };
+      }
+    }
     return {
       id,
       name: builtin?.name ?? name,
-      availableSizes: manifest
-        ? ASSET_SIZES.filter((size) =>
-            manifest.assets.some(
-              (asset) =>
-                asset.kind === 'object' &&
-                asset.id === id &&
-                asset.size === size,
-            ),
-          )
-        : defaultAvailableSizes(id),
+      availableSizes,
+      ...(Object.keys(dimensions).length ? { sourceSizes: dimensions } : {}),
       description:
         builtinDescriptions[id] ??
         `Загруженный пользователем объект «${name}». Используй, только если название подходит к запросу.`,

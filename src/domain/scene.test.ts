@@ -75,7 +75,7 @@ describe('scene domain', () => {
       role: 'main',
       x: 500,
       y: 500,
-      scale: 0.35,
+      scale: 1,
       rotation: 0,
     });
   });
@@ -109,7 +109,11 @@ describe('scene domain', () => {
     );
     const small = setSceneItemSize(original, 'item-1', 'S');
     expect(small.items.map((item) => item.size)).toEqual(['S', 'L', 'L']);
-    expect(small.items[0]).toEqual({ ...original.items[0], size: 'S' });
+    expect(small.items[0]).toEqual({
+      ...original.items[0],
+      size: 'S',
+      scale: 1,
+    });
     expect(small.items[0]).not.toBe(original.items[0]);
     expect(small.items[1]).toBe(original.items[1]);
     expect(small.items[2]).toBe(original.items[2]);
@@ -118,7 +122,11 @@ describe('scene domain', () => {
     expect(orange.items).toBe(small.items);
     expect(orange.schemeId).toBe('orange');
     const restored = setSceneItemSize(orange, 'item-1', 'L');
-    expect(restored.items).toEqual(original.items);
+    expect(restored.items).toEqual(
+      original.items.map((item, index) =>
+        index === 0 ? { ...item, scale: 1 } : item,
+      ),
+    );
     expect(restored.width).toBe(original.width);
     expect(restored.height).toBe(original.height);
     expect(original.schemeId).toBe('purple');
@@ -324,7 +332,7 @@ describe('scene item color overrides', () => {
       { x: -15, y: 45 },
     );
     expect(updated.items[0].colorOverrides).toEqual({ main: { bg1: 'obj1' } });
-    expect(updated.items[0]).toMatchObject({ scale: 0.725, rotation: -32 });
+    expect(updated.items[0]).toMatchObject({ scale: 1, rotation: -32 });
   });
 
   it('keeps independent main and background choices when switching roles and resetting', () => {
@@ -493,8 +501,8 @@ describe('scene item resizing', () => {
     expect(resized.items[0]).toEqual({ ...original.items[0], scale: 1.7 });
     expect(resized.items[0]).not.toBe(original.items[0]);
     expect(resized.items[1]).toBe(original.items[1]);
-    expect(original.items[0].scale).toBe(0.725);
-    expect(setSceneItemSize(resized, 'item-1', 'L').items[0].scale).toBe(1.7);
+    expect(original.items[0].scale).toBe(1);
+    expect(setSceneItemSize(resized, 'item-1', 'L').items[0].scale).toBe(1);
   });
 
   it('can move the center with a corner resize without changing any other item', () => {
@@ -580,7 +588,7 @@ describe('independent canvas and palette selection', () => {
         size: 'S',
         x: 247,
         y: 812,
-        scale: 0.725,
+        scale: 1,
         rotation: -32,
         colorOverrides: { main: { bg1: 'obj1' } },
       });
@@ -991,23 +999,34 @@ describe('session palettes in scenes', () => {
 });
 
 describe('canvas detail selection', () => {
-  it('changes only background detail and preserves mixed object details through background and palette changes', () => {
+  it('uses the native background size and repositions centers without resizing objects', () => {
     const original = freezeScene(
       setSceneItemSize(populatedScene(), 'item-1', 'S'),
     );
     const small = setSceneCanvasSize(original, 'S');
-    expect(small).toEqual({ ...original, canvasSize: 'S' });
-    expect(small.items).toBe(original.items);
+    expect(small).toEqual({
+      ...original,
+      canvasSize: 'S',
+      width: 500,
+      height: 500,
+      items: original.items.map((item) => ({
+        ...item,
+        x: item.x / 2,
+        y: item.y / 2,
+      })),
+    });
     expect(original.canvasSize).toBe('L');
-
     const changed = setSceneScheme(setSceneCanvas(small, 'canvas3'), 'teal');
-    expect(changed.canvasSize).toBe('S');
-    expect(changed.items).toBe(original.items);
+    expect(changed.items).toBe(small.items);
     expect(changed.items.map((item) => item.size)).toEqual(['S', 'L']);
-
     const large = setSceneCanvasSize(changed, 'L');
-    expect(large).toEqual({ ...changed, canvasSize: 'L' });
-    expect(large.items).toBe(original.items);
+    expect(large).toEqual({
+      ...changed,
+      canvasSize: 'L',
+      width: 1000,
+      height: 1000,
+      items: original.items,
+    });
   });
 
   it.each(['M', '', undefined, null])(

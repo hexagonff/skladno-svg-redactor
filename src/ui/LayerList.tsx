@@ -292,7 +292,7 @@ export function LayerList({
                 <span className="scene-object__name">{name}</span>
                 <span
                   className="size-badge"
-                  aria-label={`Детализация ${item.size}`}
+                  aria-label={`Размер исходника ${item.size}`}
                 >
                   {item.size}
                 </span>
