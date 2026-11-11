@@ -10,3 +10,6 @@ src/assets/library/*.svg
 src/assets/library/manifest.json
 test-results/
 playwright-report/
+.wrangler/
+.dev.vars
+.dev.vars.*

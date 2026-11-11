@@ -417,4 +417,9 @@ export function createComposeHandler(
   };
 }
 
-export default createComposeHandler(process.env);
+export default function compose(
+  request: NodeComposeRequest,
+  response: ServerResponse,
+): Promise<void> {
+  return createComposeHandler(process.env)(request, response);
+}
