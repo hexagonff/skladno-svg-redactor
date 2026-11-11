@@ -1,0 +1,80 @@
+.aicomposer {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.aicomposer__heading {
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.aicomposer__label {
+  display: block;
+  margin-top: 12px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.aicomposer__prompt {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 88px;
+  max-height: 240px;
+  margin-top: 6px;
+  padding: 10px;
+  border: 1px solid #dedbe7;
+  border-radius: 7px;
+  background: #fff;
+  color: #51495f;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.aicomposer__prompt::placeholder {
+  color: #8e879b;
+}
+
+.aicomposer__prompt:focus-visible {
+  outline: 3px solid #9b85e4;
+  outline-offset: 3px;
+}
+
+.aicomposer__prompt:disabled {
+  background: #f7f6f9;
+}
+
+.aicomposer__submit,
+.aicomposer__cancel {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.aicomposer__cancel {
+  border-color: var(--border);
+  background: #fff;
+  color: var(--accent);
+}
+
+.aicomposer__error,
+.aicomposer__status {
+  margin-top: 10px;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.aicomposer__error {
+  color: #a23a53;
+}
+
+.aicomposer__status {
+  color: var(--text-muted);
+}
+
+.aicomposer__status:empty {
+  display: none;
+}

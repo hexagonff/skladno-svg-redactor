@@ -167,6 +167,12 @@ a:focus-visible {
   border-right: 1px solid var(--border);
 }
 
+.library-heading {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
 .settings-panel {
   border-left: 1px solid var(--border);
 }
@@ -218,7 +224,7 @@ p {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  margin-top: 21px;
+  margin-top: 14px;
 }
 
 .library-item {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react';
 import type { ColorMap } from '../domain/colors';
 import { assignImportedColorRoles } from '../domain/importColors';
 import type { ColorScheme } from '../domain/library';
@@ -24,6 +24,9 @@ export function SvgImportPanel({ scheme, onImport }: SvgImportPanelProps) {
   const [reading, setReading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [helpPinned, setHelpPinned] = useState(false);
+  const helpId = useId();
 
   useEffect(
     () => () => {
@@ -87,23 +90,75 @@ export function SvgImportPanel({ scheme, onImport }: SvgImportPanelProps) {
         aria-label="Файл SVG"
         onChange={readFile}
       />
-      <button
-        className="button svg-import__open"
-        type="button"
-        disabled={reading}
-        onClick={() => inputRef.current?.click()}
-      >
-        {reading ? 'Читаем SVG…' : 'Загрузить SVG'}
-      </button>
-      <p className="field-hint">
-        До 2 МБ. Загруженные объекты исчезнут после перезагрузки страницы.
-      </p>
-      <p className="field-hint">
-        Цвета подбираются автоматически по текущей палитре.
-      </p>
-      <p className="field-hint">
-        Контуры и фигуры, без растра, текста и градиентов.
-      </p>
+      <div className="svg-import__actions">
+        <button
+          className="button svg-import__open"
+          type="button"
+          disabled={reading}
+          onClick={() => inputRef.current?.click()}
+        >
+          {reading ? 'Читаем SVG…' : 'Загрузить SVG'}
+        </button>
+        <div
+          className="svg-import__help"
+          onPointerEnter={(event) => {
+            if (event.pointerType === 'mouse') setHelpOpen(true);
+          }}
+          onPointerLeave={(event) => {
+            if (
+              !helpPinned &&
+              !event.currentTarget.contains(
+                event.currentTarget.ownerDocument.activeElement,
+              )
+            )
+              setHelpOpen(false);
+          }}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) {
+              setHelpOpen(false);
+              setHelpPinned(false);
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && helpOpen) {
+              event.stopPropagation();
+              setHelpOpen(false);
+              setHelpPinned(false);
+            }
+          }}
+        >
+          <button
+            className="svg-import__info"
+            type="button"
+            aria-label="О загрузке SVG"
+            aria-describedby={helpId}
+            aria-controls={helpId}
+            aria-expanded={helpOpen}
+            onFocus={() => setHelpOpen(true)}
+            onClick={() => {
+              setHelpOpen(!helpPinned);
+              setHelpPinned(!helpPinned);
+            }}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 11v6M12 7h.01" />
+            </svg>
+          </button>
+          <div
+            className="svg-import__tooltip"
+            id={helpId}
+            role="tooltip"
+            hidden={!helpOpen}
+          >
+            <p>
+              До 2 МБ. Загруженные объекты исчезнут после перезагрузки страницы.
+            </p>
+            <p>Цвета подбираются автоматически по текущей палитре.</p>
+            <p>Контуры и фигуры, без растра, текста и градиентов.</p>
+          </div>
+        </div>
+      </div>
       {error && (
         <p className="svg-import__error" role="alert">
           {error}

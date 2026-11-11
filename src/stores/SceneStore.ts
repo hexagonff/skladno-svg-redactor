@@ -1,5 +1,8 @@
 import { makeAutoObservable } from 'mobx';
 import type { ColorRole } from '../domain/colors';
+import type { CompositionPlan } from '../domain/composition';
+import { getDefaultObjectScale } from '../domain/objectDefaults';
+import { composeScene } from '../services/layout';
 import type { Point } from '../domain/geometry';
 import {
   isCustomSchemeId,
@@ -10,10 +13,7 @@ import {
   type LibraryManifest,
   type SchemeId,
 } from '../domain/library';
-import {
-  getObjectGeometry,
-  getObjectScaleForDimension,
-} from '../domain/objectGeometry';
+import { getObjectGeometry } from '../domain/objectGeometry';
 import {
   addSceneItem,
   assertScene,
@@ -129,17 +129,7 @@ export class SceneStore {
       y: this.scene.height / 2 + offset,
     });
     if (this.getManifest) {
-      const geometry = getObjectGeometry(item, this.getManifest());
-      if (isImportedAssetId(assetId)) {
-        // Imported viewBoxes may be tiny icons or large illustrations: fit uniformly.
-        item.scale = getObjectScaleForDimension(
-          item,
-          this.getManifest(),
-          geometry.width >= geometry.height ? 'width' : 'height',
-          250,
-        );
-        getObjectGeometry(item, this.getManifest());
-      }
+      item.scale = getDefaultObjectScale(assetId, this.getManifest());
     } else if (isImportedAssetId(assetId)) {
       throw new Error('Imported objects require a registered library.');
     }
@@ -147,6 +137,26 @@ export class SceneStore {
     this.issuedItemIds.add(item.id);
     this.nextItemNumber = nextNumber + 1;
     this.selectedItemId = item.id;
+  }
+
+  applyComposition(plan: CompositionPlan, seed = 0): void {
+    if (!this.getManifest) {
+      throw new Error('Для автоматической сборки требуется каталог объектов.');
+    }
+    const composed = composeScene(this.scene, this.getManifest(), plan, seed);
+    let nextNumber = this.nextItemNumber;
+    const reserved = new Set(this.issuedItemIds);
+    const items = composed.items.map((item) => {
+      while (reserved.has(`item-${nextNumber}`)) nextNumber += 1;
+      const id = `item-${nextNumber++}`;
+      reserved.add(id);
+      return { ...item, id };
+    });
+    // All validation and packing above completes before observable state changes.
+    this.scene = { ...composed, items };
+    this.issuedItemIds = reserved;
+    this.nextItemNumber = nextNumber;
+    this.selectedItemId = null;
   }
 
   selectItem(id: string | null): void {

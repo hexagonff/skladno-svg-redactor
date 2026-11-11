@@ -10,6 +10,7 @@ import { LibraryStore } from '../stores/LibraryStore';
 import { SchemeStore } from '../stores/SchemeStore';
 import { PaletteDialog } from './PaletteDialog';
 import { SvgImportPanel } from './SvgImportPanel';
+import { AiComposer } from './AiComposer';
 import { CANVAS_IDS, type LibraryManifest } from '../domain/library';
 import { clientToScenePoint, type Point } from '../domain/geometry';
 import { getSceneItemAtPoint } from '../domain/hitTest';
@@ -278,13 +279,14 @@ const Editor = observer(function Editor({
           className="workspace__panel library-panel"
           aria-labelledby="library-title"
         >
-          <div className="panel-heading">
-            <h1 id="library-title">Библиотека</h1>
-            <span className="count-badge">{catalog.length}</span>
-          </div>
-          <p className="panel-description">
-            Нажмите на объект, чтобы добавить его на холст.
-          </p>
+          <AiComposer
+            catalog={catalog}
+            onApply={(plan) => {
+              finishGesture();
+              store.applyComposition(plan);
+              setHoveredItemId(null);
+            }}
+          />
           <SvgImportPanel
             scheme={scheme}
             onImport={(name, inspected, colors) => {
@@ -292,6 +294,13 @@ const Editor = observer(function Editor({
               library.importObject(name, inspected, colors, scheme.id);
             }}
           />
+          <div className="panel-heading library-heading">
+            <h1 id="library-title">Библиотека</h1>
+            <span className="count-badge">{catalog.length}</span>
+          </div>
+          <p className="panel-description">
+            Нажмите на объект, чтобы добавить его на холст.
+          </p>
           <div className="library-grid">
             {catalog.map(({ id, name }) => {
               const preview = libraryPreviews.get(id);
