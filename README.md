@@ -1,4 +1,4 @@
-# Складно
+# skladno
 
 [Открыть приложение](https://skladno.aipictures.workers.dev)
 

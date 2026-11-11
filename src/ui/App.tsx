@@ -271,11 +271,11 @@ const Editor = observer(function Editor({
   return (
     <div className="app-shell">
       <header className="app-header">
-        <a className="brand" href="./" aria-label="Складно — SVG-конструктор">
+        <a className="brand" href="./" aria-label="skladno — SVG-конструктор">
           <span className="brand__mark" aria-hidden="true">
-            с
+            S
           </span>
-          <span className="brand__name">Складно</span>
+          <span className="brand__name">skladno</span>
           <span className="brand__description">SVG-конструктор</span>
         </a>
         <button className="button button--primary" onClick={downloadSvg}>
@@ -728,13 +728,13 @@ export default function App() {
   }
 
   return (
-    <main className="library-state" aria-label="Складно">
+    <main className="library-state" aria-label="skladno">
       <div className="library-state__content">
         <div className="brand">
           <span className="brand__mark" aria-hidden="true">
-            с
+            S
           </span>
-          <span className="brand__name">Складно</span>
+          <span className="brand__name">skladno</span>
         </div>
         {libraryState.status === 'error' ? (
           <>

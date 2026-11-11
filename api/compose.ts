@@ -171,7 +171,7 @@ async function askProvider(
     const headers: Record<string, string> = {
       Authorization: `Bearer ${key}`,
       'Content-Type': 'application/json',
-      'X-Title': 'Skladno',
+      'X-Title': 'skladno',
     };
     if (env.OPENROUTER_SITE_URL) {
       try {
