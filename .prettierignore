@@ -4,3 +4,12 @@ coverage/
 package-lock.json
 AGENTS.md
 plan.md
+allPictures/
+colors bg-object by bg/
+src/assets/library/*.svg
+src/assets/library/manifest.json
+test-results/
+playwright-report/
+.wrangler/
+.dev.vars
+.dev.vars.*

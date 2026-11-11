@@ -3,3 +3,11 @@ dist/
 coverage/
 *.tsbuildinfo
 .vite/
+test-results/
+playwright-report/
+.env
+.env.*
+!.env.example
+.wrangler/
+.dev.vars
+.dev.vars.*

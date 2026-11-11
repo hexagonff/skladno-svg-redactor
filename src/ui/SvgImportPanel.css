@@ -1,0 +1,88 @@
+.svg-import {
+  margin-top: 16px;
+  overflow-wrap: anywhere;
+}
+.svg-import__file {
+  display: none;
+}
+.svg-import__actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.svg-import__open {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+.svg-import__help {
+  flex-shrink: 0;
+}
+.svg-import__info {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 40px;
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text-muted);
+}
+.svg-import__info:hover,
+.svg-import__info[aria-expanded='true'] {
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+.svg-import__info svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+.svg-import__tooltip {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 6px);
+  right: 0;
+  left: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 5px 18px #29263818;
+  color: #51495f;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.svg-import__tooltip::before {
+  position: absolute;
+  top: -7px;
+  right: 0;
+  left: 0;
+  height: 6px;
+  content: '';
+}
+.svg-import__tooltip p + p {
+  margin-top: 8px;
+}
+.svg-import__status:empty {
+  display: none;
+}
+.svg-import__status {
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.svg-import__error {
+  margin-top: 10px;
+  color: #a23a53;
+  font-size: 12px;
+  line-height: 1.5;
+}
